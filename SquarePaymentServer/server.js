@@ -1,6 +1,6 @@
 import express from 'express';
 import crypto from 'crypto';
-import { Client, Environment } from 'square';
+import { Client, Environment } from 'square/legacy';
 
 const app = express();
 app.disable('x-powered-by');
