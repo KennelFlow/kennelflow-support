@@ -25,3 +25,15 @@ This project can be hosted on GitHub Pages, Render Static Sites, Vercel, Netlify
 
 ## Brand
 The user-provided KennelFlow logo is in `assets/kennelflow-logo.jpeg` and is treated as the brand source of truth for this build.
+
+
+Build 4 update:
+- Homepage audience messaging now includes Boarding Facilities, Pet Grooming Salons & Pet Groomers, Government Agencies, and Veterinary & Shelter Teams, with Law Enforcement removed.
+
+
+Build 5 update:
+- Smart Kennels page now shows a scannable KennelFlow download QR code with centered logo, replacing the old NFC holder placeholder.
+
+
+Build 6 update:
+- App Store QR is now a non-active placeholder until the KennelFlow App Store listing is live.
