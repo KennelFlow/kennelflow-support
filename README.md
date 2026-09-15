@@ -37,3 +37,7 @@ Build 5 update:
 
 Build 6 update:
 - App Store QR is now a non-active placeholder until the KennelFlow App Store listing is live.
+
+
+Build 7 update:
+- Home page returned to the cleaner six-card layout with a larger KennelFlow logo; expanded audience-specific cards remain on Features.

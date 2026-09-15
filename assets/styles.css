@@ -124,3 +124,8 @@ th,td{text-align:left;padding:14px 16px;border-bottom:1px solid #eceeea}th{color
   .form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}
   .price-card.featured{transform:none}
 }
+
+/* Website Build 7: larger homepage brand mark */
+.home-logo-card{padding:14px;transform:scale(1.06);transform-origin:center}
+.home-logo-card img{width:100%;display:block}
+@media(max-width:760px){.home-logo-card{transform:none}}
