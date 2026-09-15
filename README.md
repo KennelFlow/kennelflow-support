@@ -41,3 +41,6 @@ Build 6 update:
 
 Build 7 update:
 - Home page returned to the cleaner six-card layout with a larger KennelFlow logo; expanded audience-specific cards remain on Features.
+
+Build 8 update:
+- Store pages upgraded with secure Square-hosted checkout support and a companion server update package. Existing Build 7 Home design is preserved.
