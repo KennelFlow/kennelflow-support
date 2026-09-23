@@ -11,8 +11,8 @@ const accessToken = process.env.SQUARE_ACCESS_TOKEN;
 const configuredLocationID = (process.env.SQUARE_LOCATION_ID || '').trim();
 const maxPaymentCents = Number.parseInt(process.env.MAX_PAYMENT_CENTS || '5000000', 10);
 const flatShippingCents = Math.max(0, Number.parseInt(process.env.STORE_FLAT_SHIPPING_CENTS || '0', 10));
-const storeOrigin = process.env.STORE_ORIGIN || 'https://kennelflow.github.io';
-const storeSuccessURL = process.env.STORE_SUCCESS_URL || 'https://kennelflow.github.io/kennelflow-support/order-success.html';
+const storeOrigin = process.env.STORE_ORIGIN || 'https://kennelflowpro.app';
+const storeSuccessURL = process.env.STORE_SUCCESS_URL || 'https://kennelflowpro.app/order-success.html';
 const squareApiBase = isProduction ? 'https://connect.squareup.com' : 'https://connect.squareupsandbox.com';
 const squareApiVersion = '2026-08-19';
 
