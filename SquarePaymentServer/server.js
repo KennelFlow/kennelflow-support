@@ -13,6 +13,8 @@ const maxPaymentCents = Number.parseInt(process.env.MAX_PAYMENT_CENTS || '500000
 const flatShippingCents = Math.max(0, Number.parseInt(process.env.STORE_FLAT_SHIPPING_CENTS || '0', 10));
 const storeOrigin = process.env.STORE_ORIGIN || 'https://kennelflow.github.io';
 const storeSuccessURL = process.env.STORE_SUCCESS_URL || 'https://kennelflow.github.io/kennelflow-support/order-success.html';
+const quailFlowStoreSuccessURL = process.env.QUAILFLOW_STORE_SUCCESS_URL || 'https://quailflow.app/order-success.html';
+const quailFlowFlatShippingCents = Math.max(0, Number.parseInt(process.env.QUAILFLOW_STORE_FLAT_SHIPPING_CENTS || process.env.STORE_FLAT_SHIPPING_CENTS || '0', 10));
 const squareApiBase = isProduction ? 'https://connect.squareup.com' : 'https://connect.squareupsandbox.com';
 const squareApiVersion = '2026-08-19';
 
@@ -31,9 +33,18 @@ const PRODUCTS = Object.freeze({
   'facility-kit': { name: '10-Kennel Smart Facility Kit', cents: 25999 }
 });
 
+const QUAILFLOW_PRODUCTS = Object.freeze({
+  'qf-nfc-1': { name: 'QuailFlow NFC Smart Tag', cents: 1299 },
+  'qf-nfc-5': { name: '5-Pack NFC Smart Tags', cents: 5499 },
+  'qf-nfc-10': { name: '10-Pack NFC Smart Tags', cents: 9999 },
+  'qf-nfc-25': { name: '25-Pack NFC Smart Tags', cents: 21999 },
+  'qf-holder-kit': { name: 'NFC Smart Tag + Setup Holder', cents: 2999 },
+  'qf-facility-kit': { name: '10-Setup QuailFlow Smart Kit', cents: 25999 }
+});
+
 function cors(req,res,next){
   const origin=req.headers.origin;
-  const allowed=new Set([storeOrigin,'https://kennelflow.github.io']);
+  const allowed=new Set([storeOrigin,'https://kennelflow.github.io','https://quailflow.app','https://www.quailflow.app']);
   if(origin && allowed.has(origin)) res.setHeader('Access-Control-Allow-Origin',origin);
   res.setHeader('Vary','Origin');
   res.setHeader('Access-Control-Allow-Headers','Content-Type');
@@ -102,6 +113,57 @@ app.post('/store/create-checkout', async (req,res) => {
     if(!sq.ok){const detail=data?.errors?.[0]?.detail||data?.errors?.[0]?.code||'Square checkout could not be created.';return res.status(502).json({error:detail});}
     return res.json({url:data?.payment_link?.url||data?.payment_link?.long_url,orderID:data?.payment_link?.order_id||'',shippingCents:flatShippingCents});
   } catch(error){return res.status(500).json({error:error?.message||'Unable to create checkout.'});}
+});
+
+
+app.post('/quailflow/store/create-checkout', async (req,res) => {
+  try {
+    const rawItems=Array.isArray(req.body?.items)?req.body.items:[];
+    const buyer=req.body?.buyer||{};
+    const notes=String(req.body?.notes||'').trim().slice(0,350);
+    if(!rawItems.length) return res.status(400).json({error:'Your cart is empty.'});
+    if(!String(buyer.email||'').includes('@')) return res.status(400).json({error:'A valid email address is required.'});
+
+    const lineItems=[];
+    let merchandiseCents=0;
+    for(const row of rawItems){
+      const product=QUAILFLOW_PRODUCTS[String(row?.id||'')];
+      const quantity=Math.max(1,Math.min(50,Number.parseInt(row?.quantity,10)||0));
+      if(!product) return res.status(400).json({error:'Your cart contains an unavailable item.'});
+      merchandiseCents += product.cents*quantity;
+      lineItems.push({name:product.name,quantity:String(quantity),item_type:'ITEM',base_price_money:{amount:product.cents,currency:'USD'}});
+    }
+    if(merchandiseCents<=0 || merchandiseCents>maxPaymentCents) return res.status(400).json({error:'Order total is outside the allowed range.'});
+
+    if(quailFlowFlatShippingCents>0){
+      lineItems.push({name:'Standard Shipping',quantity:'1',item_type:'ITEM',base_price_money:{amount:quailFlowFlatShippingCents,currency:'USD'}});
+    }
+
+    const name=[buyer.firstName,buyer.lastName].filter(Boolean).join(' ').trim();
+    const paymentNote=['QuailFlow Store',name,notes].filter(Boolean).join(' • ').slice(0,500);
+    const body={
+      idempotency_key:crypto.randomUUID(),
+      order:{location_id:configuredLocationID,line_items:lineItems,pricing_options:{auto_apply_taxes:true}},
+      payment_note:paymentNote,
+      checkout_options:{ask_for_shipping_address:true,redirect_url:quailFlowStoreSuccessURL},
+      pre_populated_data:{buyer_email:String(buyer.email||'').trim()}
+    };
+    if(String(buyer.phone||'').trim()) body.pre_populated_data.buyer_phone_number=String(buyer.phone).trim();
+
+    const sq=await fetch(squareApiBase+'/v2/online-checkout/payment-links',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+accessToken,'Square-Version':squareApiVersion,'Content-Type':'application/json'},
+      body:JSON.stringify(body)
+    });
+    const data=await sq.json();
+    if(!sq.ok){
+      const detail=data?.errors?.[0]?.detail||data?.errors?.[0]?.code||'Square checkout could not be created.';
+      return res.status(502).json({error:detail});
+    }
+    return res.json({url:data?.payment_link?.url||data?.payment_link?.long_url,orderID:data?.payment_link?.order_id||'',shippingCents:quailFlowFlatShippingCents});
+  } catch(error){
+    return res.status(500).json({error:error?.message||'Unable to create checkout.'});
+  }
 });
 
 const port=Number.parseInt(process.env.PORT||'3000',10);
