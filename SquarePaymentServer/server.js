@@ -1,10 +1,11 @@
 import express from 'express';
 import crypto from 'crypto';
 import { Client, Environment } from 'square/legacy';
+import { installYardPatrolPortalRoutes } from './yardpatrol-portal.js';
 
 const app = express();
 app.disable('x-powered-by');
-app.use(express.json({ limit: '64kb' }));
+app.use(express.json({ limit: '2mb' }));
 
 const isProduction = process.env.SQUARE_ENVIRONMENT === 'production';
 const accessToken = process.env.SQUARE_ACCESS_TOKEN;
@@ -55,7 +56,7 @@ const RABBITFLOW_PRODUCTS = Object.freeze({
 
 function cors(req,res,next){
   const origin=req.headers.origin;
-  const allowed=new Set([storeOrigin,'https://kennelflow.github.io','https://kennelflowpro.app','https://www.kennelflowpro.app','https://quailflow.app','https://www.quailflow.app','https://rabbitflow.app','https://www.rabbitflow.app']);
+  const allowed=new Set([storeOrigin,'https://kennelflow.github.io','https://kennelflowpro.app','https://www.kennelflowpro.app','https://quailflow.app','https://www.quailflow.app','https://rabbitflow.app','https://www.rabbitflow.app','https://yardpatrol.app','https://www.yardpatrol.app']);
   if(origin && allowed.has(origin)) res.setHeader('Access-Control-Allow-Origin',origin);
   res.setHeader('Vary','Origin');
   res.setHeader('Access-Control-Allow-Headers','Content-Type');
@@ -338,6 +339,8 @@ app.post('/yardpatrol/cancel-checkout', async (req,res) => {
     return res.status(500).json({error:error?.message||'Unable to cancel Yard Patrol checkout.'});
   }
 });
+
+installYardPatrolPortalRoutes(app);
 
 const port=Number.parseInt(process.env.PORT||'3000',10);
 app.listen(port,'0.0.0.0',()=>console.log(`KennelFlow payment server running on port ${port} (${isProduction?'production':'sandbox'})`));
