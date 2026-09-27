@@ -43,7 +43,7 @@ function cors(req,res,next){
 }
 app.use(cors);
 
-app.get('/health', (_, res) => res.json({ ok: true, environment: isProduction ? 'production' : 'sandbox', storeCheckout: true }));
+app.get('/health', (_, res) => res.json({ ok: true, environment: isProduction ? 'production' : 'sandbox', storeCheckout: true, yardPatrolCheckout: true }));
 app.get('/square/config', (_, res) => res.json({ environment: isProduction ? 'production' : 'sandbox', locationIDConfigured: Boolean(configuredLocationID), maxPaymentCents }));
 
 app.post('/square/create-payment', async (req, res) => {
@@ -102,6 +102,91 @@ app.post('/store/create-checkout', async (req,res) => {
     if(!sq.ok){const detail=data?.errors?.[0]?.detail||data?.errors?.[0]?.code||'Square checkout could not be created.';return res.status(502).json({error:detail});}
     return res.json({url:data?.payment_link?.url||data?.payment_link?.long_url,orderID:data?.payment_link?.order_id||'',shippingCents:flatShippingCents});
   } catch(error){return res.status(500).json({error:error?.message||'Unable to create checkout.'});}
+});
+
+
+app.post('/yardpatrol/create-checkout', async (req,res) => {
+  try {
+    const invoiceNumber=Number.parseInt(req.body?.invoiceNumber,10);
+    const amountCents=Number.parseInt(req.body?.amountCents,10);
+    const customerName=String(req.body?.customerName||'').trim().slice(0,120);
+    const email=String(req.body?.email||'').trim().slice(0,254);
+    const phone=String(req.body?.phone||'').trim().slice(0,40);
+    if(!Number.isInteger(invoiceNumber) || invoiceNumber<=0) return res.status(400).json({error:'A valid invoice number is required.'});
+    if(!Number.isInteger(amountCents) || amountCents<=0 || amountCents>maxPaymentCents) return res.status(400).json({error:'Payment amount is outside the allowed range.'});
+    if(!customerName) return res.status(400).json({error:'Customer name is required.'});
+
+    const body={
+      idempotency_key:crypto.randomUUID(),
+      description:`Yard Patrol Invoice #${invoiceNumber}`,
+      quick_pay:{
+        name:`Yard Patrol Pet Waste Removal — Invoice #${invoiceNumber}`,
+        price_money:{amount:amountCents,currency:'USD'},
+        location_id:configuredLocationID
+      },
+      payment_note:[`Yard Patrol Invoice #${invoiceNumber}`,customerName].join(' • ').slice(0,500),
+      checkout_options:{allow_tipping:false}
+    };
+    if(email.includes('@') || phone){
+      body.pre_populated_data={};
+      if(email.includes('@')) body.pre_populated_data.buyer_email=email;
+      if(phone) body.pre_populated_data.buyer_phone_number=phone;
+    }
+
+    const sq=await fetch(`${squareApiBase}/v2/online-checkout/payment-links`,{
+      method:'POST',
+      headers:{'Authorization':`Bearer ${accessToken}`,'Square-Version':squareApiVersion,'Content-Type':'application/json'},
+      body:JSON.stringify(body)
+    });
+    const data=await sq.json();
+    if(!sq.ok){
+      const detail=data?.errors?.[0]?.detail||data?.errors?.[0]?.code||'Square checkout could not be created.';
+      return res.status(502).json({error:detail});
+    }
+    const link=data?.payment_link;
+    return res.json({url:link?.url||link?.long_url,orderID:link?.order_id||'',checkoutID:link?.id||''});
+  } catch(error){
+    return res.status(500).json({error:error?.message||'Unable to create Yard Patrol checkout.'});
+  }
+});
+
+app.post('/yardpatrol/checkout-status', async (req,res) => {
+  try {
+    const orderID=String(req.body?.orderID||'').trim();
+    const expectedAmountCents=Number.parseInt(req.body?.amountCents,10);
+    const invoiceNumber=Number.parseInt(req.body?.invoiceNumber,10);
+    if(!orderID || orderID.length>192) return res.status(400).json({error:'A valid Square order ID is required.'});
+    if(!Number.isInteger(expectedAmountCents) || expectedAmountCents<=0) return res.status(400).json({error:'A valid expected amount is required.'});
+    if(!Number.isInteger(invoiceNumber) || invoiceNumber<=0) return res.status(400).json({error:'A valid invoice number is required.'});
+
+    const sq=await fetch(`${squareApiBase}/v2/orders/${encodeURIComponent(orderID)}`,{
+      headers:{'Authorization':`Bearer ${accessToken}`,'Square-Version':squareApiVersion,'Content-Type':'application/json'}
+    });
+    const data=await sq.json();
+    if(!sq.ok){
+      const detail=data?.errors?.[0]?.detail||data?.errors?.[0]?.code||'Square order status could not be retrieved.';
+      return res.status(502).json({error:detail});
+    }
+    const order=data?.order;
+    if(!order) return res.status(502).json({error:'Square returned no order.'});
+    if(order.location_id!==configuredLocationID) return res.status(400).json({error:'Square order location does not match.'});
+
+    const total=Number(order?.total_money?.amount||0);
+    const expectedLabel=`Yard Patrol Pet Waste Removal — Invoice #${invoiceNumber}`;
+    const hasExpectedLine=Array.isArray(order?.line_items) && order.line_items.some(item=>String(item?.name||'')===expectedLabel);
+    if(total!==expectedAmountCents || !hasExpectedLine) return res.status(400).json({error:'Square order does not match this Yard Patrol invoice.'});
+
+    const state=String(order?.state||'OPEN');
+    const tender=Array.isArray(order?.tenders) ? order.tenders.find(t=>t?.payment_id) : null;
+    return res.json({
+      paid:state==='COMPLETED',
+      status:state,
+      orderID,
+      paymentID:String(tender?.payment_id||'')
+    });
+  } catch(error){
+    return res.status(500).json({error:error?.message||'Unable to verify Yard Patrol checkout.'});
+  }
 });
 
 const port=Number.parseInt(process.env.PORT||'3000',10);
