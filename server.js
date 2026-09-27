@@ -189,5 +189,32 @@ app.post('/yardpatrol/checkout-status', async (req,res) => {
   }
 });
 
+
+app.post('/yardpatrol/cancel-checkout', async (req,res) => {
+  try {
+    const checkoutID=String(req.body?.checkoutID||'').trim();
+    const orderID=String(req.body?.orderID||'').trim();
+    if(!checkoutID || checkoutID.length>192 || !orderID || orderID.length>192) {
+      return res.status(400).json({error:'Valid Square checkout and order IDs are required.'});
+    }
+    const sq=await fetch(`${squareApiBase}/v2/online-checkout/payment-links/${encodeURIComponent(checkoutID)}`,{
+      method:'DELETE',
+      headers:{'Authorization':`Bearer ${accessToken}`,'Square-Version':squareApiVersion,'Content-Type':'application/json'}
+    });
+    const data=await sq.json();
+    if(!sq.ok){
+      const detail=data?.errors?.[0]?.detail||data?.errors?.[0]?.code||'Square checkout could not be canceled.';
+      return res.status(502).json({error:detail});
+    }
+    const cancelledOrderID=String(data?.cancelled_order_id||'');
+    if(cancelledOrderID && cancelledOrderID!==orderID) {
+      return res.status(400).json({error:'Canceled Square order does not match this Yard Patrol checkout.'});
+    }
+    return res.json({canceled:true,orderID:cancelledOrderID||orderID});
+  } catch(error){
+    return res.status(500).json({error:error?.message||'Unable to cancel Yard Patrol checkout.'});
+  }
+});
+
 const port=Number.parseInt(process.env.PORT||'3000',10);
 app.listen(port,'0.0.0.0',()=>console.log(`KennelFlow payment server running on port ${port} (${isProduction?'production':'sandbox'})`));
