@@ -42,6 +42,16 @@ export function installYardPatrolPortalRoutes(app) {
       "created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())"
     );
     await pool.query("CREATE INDEX IF NOT EXISTS yardpatrol_portals_access_hash_idx ON yardpatrol_portals(access_hash)");
+    await pool.query(
+      "CREATE TABLE IF NOT EXISTS yardpatrol_business (" +
+      "business_id TEXT PRIMARY KEY, inbox_hash TEXT UNIQUE NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())"
+    );
+    await pool.query(
+      "CREATE TABLE IF NOT EXISTS yardpatrol_leads (" +
+      "id TEXT PRIMARY KEY, payload JSONB NOT NULL, status TEXT NOT NULL DEFAULT 'new', " +
+      "created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())"
+    );
+    await pool.query("CREATE INDEX IF NOT EXISTS yardpatrol_leads_status_idx ON yardpatrol_leads(status)");
   }
 
   ensureSchema()
@@ -218,6 +228,122 @@ export function installYardPatrolPortalRoutes(app) {
       return res.json({ ok:true, status });
     } catch (error) {
       return res.status(500).json({ error:error?.message || 'Unable to update customer request.' });
+    }
+  });
+
+  const leadRate = new Map();
+
+  function allowLeadRequest(req) {
+    const now = Date.now();
+    const key = String(req.ip || req.socket?.remoteAddress || 'unknown');
+    const prior = leadRate.get(key) || [];
+    const recent = prior.filter(ts => now - ts < 60 * 60 * 1000);
+    if (recent.length >= 8) return false;
+    recent.push(now);
+    leadRate.set(key,recent);
+    return true;
+  }
+
+  async function validateInboxCode(code) {
+    if (!validCode(code)) return false;
+    const result = await pool.query(
+      'SELECT inbox_hash FROM yardpatrol_business WHERE business_id=$1 LIMIT 1',
+      ['yardpatrol']
+    );
+    return result.rowCount > 0 && result.rows[0].inbox_hash === hashAccessCode(code);
+  }
+
+  app.post('/yardpatrol/inbox/sync', async (req,res) => {
+    if (!pool) return res.status(503).json({ error:'Service request inbox is unavailable.' });
+    try {
+      const supplied = String(req.body?.inboxCode || '');
+      const current = await pool.query(
+        'SELECT inbox_hash FROM yardpatrol_business WHERE business_id=$1 LIMIT 1',
+        ['yardpatrol']
+      );
+      if (current.rowCount) {
+        if (!validCode(supplied) || current.rows[0].inbox_hash !== hashAccessCode(supplied)) {
+          return res.status(401).json({ error:'The Yard Patrol inbox code does not match.' });
+        }
+        return res.json({ ok:true, created:false });
+      }
+      const inboxCode = validCode(supplied) ? supplied : generateAccessCode();
+      await pool.query(
+        'INSERT INTO yardpatrol_business(business_id,inbox_hash) VALUES($1,$2)',
+        ['yardpatrol',hashAccessCode(inboxCode)]
+      );
+      return res.json({ ok:true, created:true, inboxCode });
+    } catch (error) {
+      return res.status(500).json({ error:error?.message || 'Unable to initialize the service request inbox.' });
+    }
+  });
+
+  app.post('/yardpatrol/leads', async (req,res) => {
+    if (!pool) return res.status(503).json({ error:'Service requests are temporarily unavailable.' });
+    if (!allowLeadRequest(req)) return res.status(429).json({ error:'Too many requests. Please try again later.' });
+    try {
+      const fullName = String(req.body?.fullName || '').trim().slice(0,120);
+      const serviceAddress = String(req.body?.serviceAddress || '').trim().slice(0,180);
+      const city = String(req.body?.city || '').trim().slice(0,80);
+      const state = String(req.body?.state || '').trim().slice(0,40);
+      const zip = String(req.body?.zip || '').trim().slice(0,20);
+      const phone = String(req.body?.phone || '').trim().slice(0,40);
+      const email = String(req.body?.email || '').trim().slice(0,254);
+      const plan = String(req.body?.plan || '').trim().slice(0,60);
+      const dogCount = Math.max(1,Math.min(20,Number.parseInt(req.body?.dogCount,10) || 1));
+      const notes = String(req.body?.notes || '').trim().slice(0,1200);
+      if (!fullName || !serviceAddress || !city || !state || (!phone && !email)) {
+        return res.status(400).json({ error:'Name, service address, city, state, and a phone or email are required.' });
+      }
+      if (email && !email.includes('@')) return res.status(400).json({ error:'Enter a valid email address.' });
+      const id = crypto.randomUUID();
+      const payload = {fullName,serviceAddress,city,state,zip,phone,email,plan,dogCount,notes,source:String(req.body?.source || 'Yard Patrol').slice(0,80)};
+      await pool.query(
+        'INSERT INTO yardpatrol_leads(id,payload,status) VALUES($1,$2::jsonb,$3)',
+        [id,JSON.stringify(payload),'new']
+      );
+      return res.json({ ok:true, requestID:id });
+    } catch (error) {
+      return res.status(500).json({ error:error?.message || 'Unable to submit service request.' });
+    }
+  });
+
+  app.post('/yardpatrol/inbox/leads', async (req,res) => {
+    if (!pool) return res.status(503).json({ error:'Service request inbox is unavailable.' });
+    try {
+      const code = String(req.body?.inboxCode || '');
+      if (!(await validateInboxCode(code))) {
+        return res.status(401).json({ error:'The Yard Patrol inbox code was not recognized.' });
+      }
+      const result = await pool.query(
+        'SELECT id,payload,status,created_at,updated_at FROM yardpatrol_leads ORDER BY created_at DESC LIMIT 250'
+      );
+      return res.json({ ok:true, leads:result.rows });
+    } catch (error) {
+      return res.status(500).json({ error:error?.message || 'Unable to load service requests.' });
+    }
+  });
+
+  app.post('/yardpatrol/inbox/lead-status', async (req,res) => {
+    if (!pool) return res.status(503).json({ error:'Service request inbox is unavailable.' });
+    try {
+      const code = String(req.body?.inboxCode || '');
+      const id = String(req.body?.id || '').trim().slice(0,80);
+      const status = String(req.body?.status || '').trim().toLowerCase();
+      if (!(await validateInboxCode(code))) {
+        return res.status(401).json({ error:'The Yard Patrol inbox code was not recognized.' });
+      }
+      if (!id || !['new','contacted','approved','declined'].includes(status)) {
+        return res.status(400).json({ error:'Valid request ID and status are required.' });
+      }
+      const result = await pool.query(
+        'UPDATE yardpatrol_leads SET status=$2,updated_at=NOW() WHERE id=$1 RETURNING id',
+        [id,status]
+      );
+      if (!result.rowCount) return res.status(404).json({ error:'Service request was not found.' });
+      return res.json({ ok:true, status });
+    } catch (error) {
+      return res.status(500).json({ error:error?.message || 'Unable to update service request.' });
     }
   });
 
