@@ -26,6 +26,7 @@ function validCode(value) {
 
 export function installYardPatrolPortalRoutes(app) {
   const databaseURL = String(process.env.DATABASE_URL || '').trim();
+  const ownerRecoveryCode = String(process.env.YARDPATROL_OWNER_RECOVERY_CODE || '').trim();
   const pool = databaseURL ? new Pool({
     connectionString: databaseURL,
     ssl: databaseURL.includes('localhost') ? false : { rejectUnauthorized: false },
@@ -46,6 +47,8 @@ export function installYardPatrolPortalRoutes(app) {
       "CREATE TABLE IF NOT EXISTS yardpatrol_business (" +
       "business_id TEXT PRIMARY KEY, inbox_hash TEXT UNIQUE NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())"
     );
+    await pool.query("ALTER TABLE yardpatrol_business ADD COLUMN IF NOT EXISTS owner_recovery_used BOOLEAN NOT NULL DEFAULT FALSE");
+    await pool.query("ALTER TABLE yardpatrol_business ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()");
     await pool.query(
       "CREATE TABLE IF NOT EXISTS yardpatrol_leads (" +
       "id TEXT PRIMARY KEY, payload JSONB NOT NULL, status TEXT NOT NULL DEFAULT 'new', " +
@@ -288,12 +291,27 @@ export function installYardPatrolPortalRoutes(app) {
     try {
       const supplied = String(req.body?.inboxCode || '');
       const current = await pool.query(
-        'SELECT inbox_hash FROM yardpatrol_business WHERE business_id=$1 LIMIT 1',
+        'SELECT inbox_hash,owner_recovery_used FROM yardpatrol_business WHERE business_id=$1 LIMIT 1',
         ['yardpatrol-v2']
       );
       if (current.rowCount) {
-        if (!validCode(supplied) || current.rows[0].inbox_hash !== hashAccessCode(supplied)) {
-          return res.status(401).json({ error:'The Yard Patrol inbox code does not match.' });
+        const validExisting = validCode(supplied) && current.rows[0].inbox_hash === hashAccessCode(supplied);
+        if (!validExisting) {
+          const validRecovery =
+            ownerRecoveryCode &&
+            validCode(supplied) &&
+            supplied === ownerRecoveryCode &&
+            !current.rows[0].owner_recovery_used;
+
+          if (!validRecovery) {
+            return res.status(401).json({ error:'The Yard Patrol inbox code does not match.' });
+          }
+
+          await pool.query(
+            'UPDATE yardpatrol_business SET inbox_hash=$2,owner_recovery_used=TRUE,updated_at=NOW() WHERE business_id=$1 AND owner_recovery_used=FALSE',
+            ['yardpatrol-v2',hashAccessCode(supplied)]
+          );
+          return res.json({ ok:true, created:false, recovered:true });
         }
         return res.json({ ok:true, created:false });
       }
