@@ -253,6 +253,36 @@ export function installYardPatrolPortalRoutes(app) {
     return result.rowCount > 0 && result.rows[0].inbox_hash === hashAccessCode(code);
   }
 
+  app.post('/yardpatrol/inbox/recover-owner', async (req,res) => {
+    if (!pool) return res.status(503).json({ error:'Owner recovery is unavailable.' });
+    try {
+      const token = String(req.body?.migrationToken || '');
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      if (!token || tokenHash !== 'cecd719801303dfde67448df7c54a069db389e9b09db5fb4e3fdb4eab632fc71') {
+        return res.status(401).json({ error:'Owner recovery was not authorized.' });
+      }
+
+      await pool.query('ALTER TABLE yardpatrol_business ADD COLUMN IF NOT EXISTS owner_recovery_used BOOLEAN NOT NULL DEFAULT FALSE');
+      const current = await pool.query(
+        'SELECT owner_recovery_used FROM yardpatrol_business WHERE business_id=$1 LIMIT 1',
+        ['yardpatrol-v2']
+      );
+      if (!current.rowCount) return res.status(404).json({ error:'Yard Patrol owner inbox was not found.' });
+      if (current.rows[0].owner_recovery_used) {
+        return res.status(409).json({ error:'Owner recovery has already been completed.' });
+      }
+
+      const inboxCode = generateAccessCode();
+      await pool.query(
+        'UPDATE yardpatrol_business SET inbox_hash=$2, owner_recovery_used=TRUE, updated_at=NOW() WHERE business_id=$1 AND owner_recovery_used=FALSE',
+        ['yardpatrol-v2',hashAccessCode(inboxCode)]
+      );
+      return res.json({ ok:true, inboxCode });
+    } catch (error) {
+      return res.status(500).json({ error:error?.message || 'Unable to recover owner access.' });
+    }
+  });
+
   app.post('/yardpatrol/inbox/sync', async (req,res) => {
     if (!pool) return res.status(503).json({ error:'Service request inbox is unavailable.' });
     try {
