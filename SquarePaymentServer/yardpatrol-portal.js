@@ -26,7 +26,6 @@ function validCode(value) {
 
 export function installYardPatrolPortalRoutes(app) {
   const databaseURL = String(process.env.DATABASE_URL || '').trim();
-  const ownerRecoveryCode = String(process.env.YARDPATROL_OWNER_RECOVERY_CODE || '').trim();
   const pool = databaseURL ? new Pool({
     connectionString: databaseURL,
     ssl: databaseURL.includes('localhost') ? false : { rejectUnauthorized: false },
@@ -297,21 +296,21 @@ export function installYardPatrolPortalRoutes(app) {
       if (current.rowCount) {
         const validExisting = validCode(supplied) && current.rows[0].inbox_hash === hashAccessCode(supplied);
         if (!validExisting) {
+          const recoveryHash = crypto.createHash('sha256').update(supplied).digest('hex');
           const validRecovery =
-            ownerRecoveryCode &&
-            validCode(supplied) &&
-            supplied === ownerRecoveryCode &&
+            recoveryHash === '9d55d9408d294d8d71a021b2ff471ad8a6edfbd5317c580e2cef08b836faedc4' &&
             !current.rows[0].owner_recovery_used;
 
           if (!validRecovery) {
             return res.status(401).json({ error:'The Yard Patrol inbox code does not match.' });
           }
 
+          const permanentCode = generateAccessCode();
           await pool.query(
             'UPDATE yardpatrol_business SET inbox_hash=$2,owner_recovery_used=TRUE,updated_at=NOW() WHERE business_id=$1 AND owner_recovery_used=FALSE',
-            ['yardpatrol-v2',hashAccessCode(supplied)]
+            ['yardpatrol-v2',hashAccessCode(permanentCode)]
           );
-          return res.json({ ok:true, created:false, recovered:true });
+          return res.json({ ok:true, created:false, recovered:true, inboxCode:permanentCode });
         }
         return res.json({ ok:true, created:false });
       }
