@@ -248,7 +248,7 @@ export function installYardPatrolPortalRoutes(app) {
     if (!validCode(code)) return false;
     const result = await pool.query(
       'SELECT inbox_hash FROM yardpatrol_business WHERE business_id=$1 LIMIT 1',
-      ['yardpatrol']
+      ['yardpatrol-v2']
     );
     return result.rowCount > 0 && result.rows[0].inbox_hash === hashAccessCode(code);
   }
@@ -259,7 +259,7 @@ export function installYardPatrolPortalRoutes(app) {
       const supplied = String(req.body?.inboxCode || '');
       const current = await pool.query(
         'SELECT inbox_hash FROM yardpatrol_business WHERE business_id=$1 LIMIT 1',
-        ['yardpatrol']
+        ['yardpatrol-v2']
       );
       if (current.rowCount) {
         if (!validCode(supplied) || current.rows[0].inbox_hash !== hashAccessCode(supplied)) {
@@ -270,7 +270,7 @@ export function installYardPatrolPortalRoutes(app) {
       const inboxCode = validCode(supplied) ? supplied : generateAccessCode();
       await pool.query(
         'INSERT INTO yardpatrol_business(business_id,inbox_hash) VALUES($1,$2)',
-        ['yardpatrol',hashAccessCode(inboxCode)]
+        ['yardpatrol-v2',hashAccessCode(inboxCode)]
       );
       return res.json({ ok:true, created:true, inboxCode });
     } catch (error) {
