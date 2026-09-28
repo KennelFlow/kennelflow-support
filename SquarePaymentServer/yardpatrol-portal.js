@@ -50,9 +50,9 @@ export function installYardPatrolPortalRoutes(app) {
     await pool.query("ALTER TABLE yardpatrol_business ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()");
     await pool.query("ALTER TABLE yardpatrol_business ADD COLUMN IF NOT EXISTS owner_code_version INTEGER NOT NULL DEFAULT 0");
     await pool.query(
-      "UPDATE yardpatrol_business SET inbox_hash=$2, owner_recovery_used=TRUE, owner_code_version=12, updated_at=NOW() " +
-      "WHERE business_id=$1 AND owner_code_version < 12",
-      ['yardpatrol-v2','840c0f2369cc621aac8ea3493800fa5ea448eba9dd59170345b254c504a46df1']
+      "UPDATE yardpatrol_business SET inbox_hash=$2, owner_recovery_used=TRUE, owner_code_version=13, updated_at=NOW() " +
+      "WHERE business_id=$1 AND owner_code_version < 13",
+      ['yardpatrol-v2','21fd661bf3922bc7e47cc077540a9fc8423d41ba45d97ae2f7946528c559fde8']
     );
     await pool.query(
       "CREATE TABLE IF NOT EXISTS yardpatrol_leads (" +
