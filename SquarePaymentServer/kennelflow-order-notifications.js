@@ -50,12 +50,9 @@ function orderDetails(order,payment,products){
   };
 }
 async function sendEmail(details){
-  const apiKey=String(process.env.RESEND_API_KEY||'').trim();
   const to=String(process.env.ORDER_NOTIFICATION_EMAIL||'').trim();
-  if(!apiKey || !to) return {skipped:true};
+  if(!to) return {skipped:true};
 
-  const from=String(process.env.RESEND_FROM_EMAIL||
-    'KennelFlow Orders <onboarding@resend.dev>').trim();
   const subject='KennelFlow New Order — '+details.total;
   const text=[
     'NEW KENNELFLOW STORE ORDER',
@@ -79,16 +76,39 @@ async function sendEmail(details){
     (details.note?'<p><strong>Order notes:</strong> '+escapeHTML(details.note)+'</p>':'')+
     '<p style="color:#667">Square Order ID: '+escapeHTML(details.orderID)+'</p></div>';
 
-  const response=await fetch('https://api.resend.com/emails',{
-    method:'POST',
-    headers:{Authorization:'Bearer '+apiKey,'Content-Type':'application/json'},
-    body:JSON.stringify({from,to:[to],subject,text,html})
-  });
-  if(!response.ok){
+  const sid=String(process.env.TWILIO_ACCOUNT_SID||'').trim();
+  const token=String(process.env.TWILIO_AUTH_TOKEN||'').trim();
+  if(sid && token){
+    const auth=Buffer.from(sid+':'+token).toString('base64');
+    const response=await fetch('https://comms.twilio.com/v1/Emails',{
+      method:'POST',
+      headers:{Authorization:'Basic '+auth,'Content-Type':'application/json'},
+      body:JSON.stringify({
+        from:{address:sid+'@twilio.email',name:'KennelFlow Orders'},
+        to:[{address:to}],
+        content:{subject,html}
+      })
+    });
+    if(response.ok) return {ok:true,provider:'twilio'};
     const detail=await response.text();
-    throw new Error('Resend email failed ('+response.status+'): '+detail.slice(0,300));
+    console.error('Twilio email failed ('+response.status+'): '+detail.slice(0,300));
   }
-  return {ok:true};
+
+  const apiKey=String(process.env.RESEND_API_KEY||'').trim();
+  if(apiKey){
+    const from=String(process.env.RESEND_FROM_EMAIL||
+      'KennelFlow Orders <onboarding@resend.dev>').trim();
+    const response=await fetch('https://api.resend.com/emails',{
+      method:'POST',
+      headers:{Authorization:'Bearer '+apiKey,'Content-Type':'application/json'},
+      body:JSON.stringify({from,to:[to],subject,text,html})
+    });
+    if(response.ok) return {ok:true,provider:'resend'};
+    const detail=await response.text();
+    throw new Error('Email delivery failed. Resend ('+response.status+'): '+detail.slice(0,300));
+  }
+
+  return {skipped:true};
 }
 
 async function sendText(details){
@@ -149,8 +169,8 @@ export function installKennelFlowOrderNotificationRoutes(app,config){
       const details=orderDetails(order,payment,config.products);
       if(!details) return res.sendStatus(200);
       const tasks=[];
-      if(String(process.env.RESEND_API_KEY||'').trim() &&
-         String(process.env.ORDER_NOTIFICATION_EMAIL||'').trim() &&
+      if(String(process.env.ORDER_NOTIFICATION_EMAIL||'').trim() &&
+         ((String(process.env.TWILIO_ACCOUNT_SID||'').trim() && String(process.env.TWILIO_AUTH_TOKEN||'').trim()) || String(process.env.RESEND_API_KEY||'').trim()) &&
          remember(emailedPayments,details.paymentID)){
         tasks.push(sendEmail(details).catch(error=>{
           emailedPayments.delete(details.paymentID);
