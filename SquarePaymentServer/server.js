@@ -2,10 +2,11 @@ import express from 'express';
 import crypto from 'crypto';
 import { Client, Environment } from 'square/legacy';
 import { installYardPatrolPortalRoutes } from './yardpatrol-portal.js';
+import { installKennelFlowOrderNotificationRoutes } from './kennelflow-order-notifications.js';
 
 const app = express();
 app.disable('x-powered-by');
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '2mb', verify:(req,res,buf)=>{ req.rawBody=buf.toString('utf8'); } }));
 
 const isProduction = process.env.SQUARE_ENVIRONMENT === 'production';
 const accessToken = process.env.SQUARE_ACCESS_TOKEN;
@@ -68,6 +69,14 @@ app.use(cors);
 
 app.get('/health', (_, res) => res.json({ ok: true, environment: isProduction ? 'production' : 'sandbox', storeCheckout: true, yardPatrolCheckout: true }));
 app.get('/square/config', (_, res) => res.json({ environment: isProduction ? 'production' : 'sandbox', locationIDConfigured: Boolean(configuredLocationID), maxPaymentCents }));
+
+installKennelFlowOrderNotificationRoutes(app,{
+  accessToken,
+  configuredLocationID,
+  squareApiBase,
+  squareApiVersion,
+  products:PRODUCTS
+});
 
 app.post('/square/create-payment', async (req, res) => {
   try {
