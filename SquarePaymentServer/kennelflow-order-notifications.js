@@ -55,7 +55,7 @@ async function sendEmail(details){
   if(!apiKey || !to) return {skipped:true};
 
   const from=String(process.env.RESEND_FROM_EMAIL||
-    'KennelFlow Orders <orders@kennelflowpro.app>').trim();
+    'KennelFlow Orders <onboarding@resend.dev>').trim();
   const subject='KennelFlow New Order — '+details.total;
   const text=[
     'NEW KENNELFLOW STORE ORDER',
