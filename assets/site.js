@@ -4,6 +4,7 @@ const PRODUCTS = {
   'nfc-10': {name:'10-Pack NFC Tags', price:39.99, inStock:true},
   'nfc-25': {name:'25-Pack NFC Tags', price:84.99, inStock:true},
   'holder-kit': {name:'NFC Tag + Kennel Holder', price:14.99, inStock:true},
+  'holder-5': {name:'5-Kennel Smart Holder Set', price:69.99, inStock:true},
   'facility-kit': {name:'10-Kennel Smart Facility Kit', price:134.99, inStock:true}
 };
 function getCart(){ try{return JSON.parse(localStorage.getItem('kfCart'))||{}}catch{return{}} }

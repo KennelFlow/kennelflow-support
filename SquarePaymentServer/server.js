@@ -34,6 +34,7 @@ const PRODUCTS = Object.freeze({
   'nfc-10': { name: '10-Pack NFC Tags', cents: 3999 },
   'nfc-25': { name: '25-Pack NFC Tags', cents: 8499 },
   'holder-kit': { name: 'NFC Tag + Kennel Holder', cents: 1499 },
+  'holder-5': { name: '5-Kennel Smart Holder Set', cents: 6999 },
   'facility-kit': { name: '10-Kennel Smart Facility Kit', cents: 13499 }
 });
 
