@@ -39,12 +39,10 @@ const PRODUCTS = Object.freeze({
 });
 
 const QUAILFLOW_PRODUCTS = Object.freeze({
-  'qf-nfc-1': { name: 'QuailFlow NFC Smart Tag', cents: 1299 },
-  'qf-nfc-5': { name: '5-Pack NFC Smart Tags', cents: 5499 },
-  'qf-nfc-10': { name: '10-Pack NFC Smart Tags', cents: 9999 },
-  'qf-nfc-25': { name: '25-Pack NFC Smart Tags', cents: 21999 },
-  'qf-holder-kit': { name: 'NFC Smart Tag + Setup Holder', cents: 2999 },
-  'qf-facility-kit': { name: '10-Setup QuailFlow Smart Kit', cents: 25999 }
+  'qf-nfc-1': { name: '1 Quail + Embedded NFC', cents: 499 },
+  'qf-nfc-5': { name: '5 Quail + Embedded NFC', cents: 2299 },
+  'qf-nfc-10': { name: '10 Quail + Embedded NFC', cents: 3999 },
+  'qf-nfc-25': { name: '25 Quail + Embedded NFC', cents: 8499 }
 });
 
 const RABBITFLOW_PRODUCTS = Object.freeze({
