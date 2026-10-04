@@ -46,12 +46,10 @@ const QUAILFLOW_PRODUCTS = Object.freeze({
 });
 
 const RABBITFLOW_PRODUCTS = Object.freeze({
-  'rf-nfc-1': { name: 'RabbitFlow NFC Smart Tag', cents: 1299 },
-  'rf-nfc-5': { name: '5-Pack NFC Smart Tags', cents: 5499 },
-  'rf-nfc-10': { name: '10-Pack NFC Smart Tags', cents: 9999 },
-  'rf-nfc-25': { name: '25-Pack NFC Smart Tags', cents: 21999 },
-  'rf-holder-kit': { name: 'NFC Smart Tag + Cage Holder', cents: 2999 },
-  'rf-facility-kit': { name: '10-Cage RabbitFlow Smart Kit', cents: 25999 }
+  'rf-nfc-1': { name: '1 Rabbit + Embedded NFC', cents: 499 },
+  'rf-nfc-5': { name: '5 Rabbits + Embedded NFC', cents: 2299 },
+  'rf-nfc-10': { name: '10 Rabbits + Embedded NFC', cents: 3999 },
+  'rf-nfc-25': { name: '25 Rabbits + Embedded NFC', cents: 8499 }
 });
 
 function cors(req,res,next){
