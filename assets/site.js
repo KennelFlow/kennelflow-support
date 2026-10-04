@@ -1,10 +1,10 @@
 const PRODUCTS = {
-  'nfc-1': {name:'KennelFlow NFC Tag', price:12.99, inStock:true},
-  'nfc-5': {name:'5-Pack NFC Tags', price:54.99, inStock:true},
-  'nfc-10': {name:'10-Pack NFC Tags', price:99.99, inStock:true},
-  'nfc-25': {name:'25-Pack NFC Tags', price:219.99, inStock:true},
-  'holder-kit': {name:'NFC Tag + Kennel Holder', price:29.99, inStock:true},
-  'facility-kit': {name:'10-Kennel Smart Facility Kit', price:259.99, inStock:true}
+  'nfc-1': {name:'KennelFlow NFC Tag', price:4.99, inStock:true},
+  'nfc-5': {name:'5-Pack NFC Tags', price:22.99, inStock:true},
+  'nfc-10': {name:'10-Pack NFC Tags', price:39.99, inStock:true},
+  'nfc-25': {name:'25-Pack NFC Tags', price:84.99, inStock:true},
+  'holder-kit': {name:'NFC Tag + Kennel Holder', price:14.99, inStock:true},
+  'facility-kit': {name:'10-Kennel Smart Facility Kit', price:134.99, inStock:true}
 };
 function getCart(){ try{return JSON.parse(localStorage.getItem('kfCart'))||{}}catch{return{}} }
 function setCart(cart){localStorage.setItem('kfCart',JSON.stringify(cart));renderCart();}

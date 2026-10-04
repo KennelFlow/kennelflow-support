@@ -23,12 +23,12 @@ const environment = isProduction ? Environment.Production : Environment.Sandbox;
 const client = new Client({ bearerAuthCredentials: { accessToken }, environment });
 
 const PRODUCTS = Object.freeze({
-  'nfc-1': { name: 'KennelFlow NFC Tag', cents: 1299 },
-  'nfc-5': { name: '5-Pack NFC Tags', cents: 5499 },
-  'nfc-10': { name: '10-Pack NFC Tags', cents: 9999 },
-  'nfc-25': { name: '25-Pack NFC Tags', cents: 21999 },
-  'holder-kit': { name: 'NFC Tag + Kennel Holder', cents: 2999 },
-  'facility-kit': { name: '10-Kennel Smart Facility Kit', cents: 25999 }
+  'nfc-1': { name: 'KennelFlow NFC Tag', cents: 499 },
+  'nfc-5': { name: '5-Pack NFC Tags', cents: 2299 },
+  'nfc-10': { name: '10-Pack NFC Tags', cents: 3999 },
+  'nfc-25': { name: '25-Pack NFC Tags', cents: 8499 },
+  'holder-kit': { name: 'NFC Tag + Kennel Holder', cents: 1499 },
+  'facility-kit': { name: '10-Kennel Smart Facility Kit', cents: 13499 }
 });
 
 function cors(req,res,next){
