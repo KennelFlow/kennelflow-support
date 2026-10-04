@@ -22,11 +22,17 @@ function escapeHTML(value){
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[ch]));
 }
-function orderDetails(order,payment,products){
-  const productNames=new Set(Object.values(products).map(p=>p.name));
+function orderDetails(order,payment,stores){
   const allItems=Array.isArray(order?.line_items)?order.line_items:[];
-  const items=allItems.filter(item=>productNames.has(String(item?.name||'')));
-  if(!items.length) return null;
+  let storeName='';
+  let matchedProducts=null;
+  for(const [name,products] of Object.entries(stores||{})){
+    const productNames=new Set(Object.values(products).map(p=>p.name));
+    const matches=allItems.filter(item=>productNames.has(String(item?.name||'')));
+    if(matches.length){ storeName=name; matchedProducts=matches; break; }
+  }
+  if(!matchedProducts) return null;
+  const items=matchedProducts;
 
   const shipment=(Array.isArray(order?.fulfillments)?order.fulfillments:[])
     .map(f=>f?.shipment_details?.recipient).find(Boolean)||{};
@@ -34,6 +40,7 @@ function orderDetails(order,payment,products){
   const noteParts=String(payment?.note||'').split(' • ');
 
   return {
+    storeName,
     customerName:shipment.display_name||noteParts[1]||'Customer',
     customerEmail:payment?.buyer_email_address||'See Square order',
     customerPhone:shipment.phone_number||'See Square order',
@@ -53,9 +60,9 @@ async function sendEmail(details){
   const to=String(process.env.ORDER_NOTIFICATION_EMAIL||'').trim();
   if(!to) return {skipped:true};
 
-  const subject='KennelFlow New Order — '+details.total;
+  const subject=details.storeName+' New Order — '+details.total;
   const text=[
-    'NEW KENNELFLOW STORE ORDER',
+    'NEW '+details.storeName.toUpperCase()+' STORE ORDER',
     'Total: '+details.total,
     'Customer: '+details.customerName,
     'Email: '+details.customerEmail,
@@ -66,7 +73,7 @@ async function sendEmail(details){
   ].filter(Boolean).join('\n');
 
   const html='<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:640px">'+
-    '<h2 style="color:#174d35">New KennelFlow Store Order</h2>'+
+    '<h2 style="color:#174d35">New '+escapeHTML(details.storeName)+' Store Order</h2>'+ 
     '<p style="font-size:24px;font-weight:700">'+escapeHTML(details.total)+'</p>'+
     '<p><strong>Customer:</strong> '+escapeHTML(details.customerName)+'<br>'+
     '<strong>Email:</strong> '+escapeHTML(details.customerEmail)+'<br>'+
@@ -84,7 +91,7 @@ async function sendEmail(details){
       method:'POST',
       headers:{Authorization:'Basic '+auth,'Content-Type':'application/json'},
       body:JSON.stringify({
-        from:{address:sid+'@twilio.email',name:'KennelFlow Orders'},
+        from:{address:sid+'@twilio.email',name:details.storeName+' Orders'},
         to:[{address:to}],
         content:{subject,html}
       })
@@ -117,7 +124,7 @@ async function sendText(details){
   const from=String(process.env.TWILIO_FROM_NUMBER||'').trim();
   const to=String(process.env.ORDER_NOTIFICATION_PHONE||'').trim();
   if(!sid || !token || !from || !to) return {skipped:true};
-  const body=('KennelFlow NEW ORDER: '+details.total+' from '+details.customerName+
+  const body=(details.storeName+' NEW ORDER / PAYMENT RECEIVED: '+details.total+' from '+details.customerName+
     '. '+details.items.replace(/\n/g,'; ')+'. Order '+details.orderID).slice(0,1000);
   const form=new URLSearchParams({To:to,From:from,Body:body});
   const auth=Buffer.from(sid+':'+token).toString('base64');
@@ -166,7 +173,7 @@ export function installKennelFlowOrderNotificationRoutes(app,config){
       if(config.configuredLocationID && payment.location_id!==config.configuredLocationID) return res.sendStatus(200);
 
       const order=await fetchOrder(payment.order_id,config);
-      const details=orderDetails(order,payment,config.products);
+      const details=orderDetails(order,payment,config.stores);
       if(!details) return res.sendStatus(200);
       const tasks=[];
       if(String(process.env.ORDER_NOTIFICATION_EMAIL||'').trim() &&
@@ -174,7 +181,7 @@ export function installKennelFlowOrderNotificationRoutes(app,config){
          remember(emailedPayments,details.paymentID)){
         tasks.push(sendEmail(details).catch(error=>{
           emailedPayments.delete(details.paymentID);
-          console.error('KennelFlow order email error:',error?.message||error);
+          console.error(details.storeName+' order email error:',error?.message||error);
         }));
       }
       if(String(process.env.TWILIO_ACCOUNT_SID||'').trim() &&
@@ -182,15 +189,15 @@ export function installKennelFlowOrderNotificationRoutes(app,config){
          remember(textedPayments,details.paymentID)){
         tasks.push(sendText(details).catch(error=>{
           textedPayments.delete(details.paymentID);
-          console.error('KennelFlow order text error:',error?.message||error);
+          console.error(details.storeName+' order text error:',error?.message||error);
         }));
       }
 
       await Promise.all(tasks);
-      console.log('KennelFlow order notification processed:',details.orderID,details.total);
+      console.log(details.storeName+' order notification processed:',details.orderID,details.total);
       return res.sendStatus(200);
     }catch(error){
-      console.error('KennelFlow Square webhook error:',error?.message||error);
+      console.error('Store Square webhook error:',error?.message||error);
       return res.sendStatus(500);
     }
   });

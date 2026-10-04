@@ -72,7 +72,7 @@ installKennelFlowOrderNotificationRoutes(app,{
   configuredLocationID,
   squareApiBase,
   squareApiVersion,
-  products:PRODUCTS
+  stores:{ KennelFlow:PRODUCTS, QuailFlow:QUAILFLOW_PRODUCTS, RabbitFlow:RABBITFLOW_PRODUCTS }
 });
 
 app.post('/square/create-payment', async (req, res) => {
