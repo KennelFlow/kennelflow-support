@@ -1,4 +1,5 @@
 const PRODUCTS = {
+  'dog-tag': {name:'Smart Kennel Management Dog Tag', price:15.00, inStock:true},
   'nfc-1': {name:'KennelFlow NFC Tag', price:4.99, inStock:true},
   'nfc-5': {name:'5-Pack NFC Tags', price:22.99, inStock:true},
   'nfc-10': {name:'10-Pack NFC Tags', price:39.99, inStock:true},
