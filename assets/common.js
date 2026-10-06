@@ -3,9 +3,9 @@ function header(active=''){
     <a class="brand" href="index.html"><img src="assets/kennelflow-logo.jpeg" alt="KennelFlow logo"><span>KennelFlow</span></a>
     <button class="mobile-toggle" onclick="navToggle()" aria-label="Menu">☰</button>
     <nav class="nav-links">
-      <a href="features.html">Features</a><a href="smart-kennels.html">Smart Kennels</a><a href="shop.html">Shop</a><a href="pricing.html">Pricing</a><a href="support.html">Support</a>
+      <a href="features.html">Features</a><a href="smart-kennels.html">Smart Kennels</a><a href="shop.html">Store</a><a href="pricing.html">Pricing</a><a href="support.html">Support</a>
     </nav>
-    <div class="nav-actions"><a class="btn btn-secondary" href="download.html">Download</a><a class="btn btn-primary" href="shop.html">Shop NFC</a></div>
+    <div class="nav-actions"><a class="btn btn-secondary" href="download.html">Download</a><a class="btn btn-primary" href="shop.html">Store</a></div>
   </div></header>`;
 }
 function footer(){
