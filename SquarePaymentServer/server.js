@@ -29,7 +29,8 @@ const environment = isProduction ? Environment.Production : Environment.Sandbox;
 const client = new Client({ bearerAuthCredentials: { accessToken }, environment });
 
 const PRODUCTS = Object.freeze({
-  'dog-tag': { name: 'Smart Kennel Management Dog Tag', cents: 1500 },
+  'dog-tag': { name: 'Smart Kennel Management Dog Tag', cents: 999 },
+  'kennel-crate-tag': { name: 'Smart Kennel Management Kennel/Crate Tag', cents: 1499 },
   'nfc-1': { name: 'KennelFlow NFC Tag', cents: 499 },
   'nfc-5': { name: '5-Pack NFC Tags', cents: 2299 },
   'nfc-10': { name: '10-Pack NFC Tags', cents: 3999 },
