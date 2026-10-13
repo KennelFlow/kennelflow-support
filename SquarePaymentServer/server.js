@@ -16,6 +16,8 @@ const flatShippingCents = Math.max(0, Number.parseInt(process.env.STORE_FLAT_SHI
 const storeOrigin = process.env.STORE_ORIGIN || 'https://kennelflowpro.app';
 const storeSuccessURL = process.env.STORE_SUCCESS_URL || 'https://kennelflowpro.app/order-success.html';
 const quailFlowStoreSuccessURL = process.env.QUAILFLOW_STORE_SUCCESS_URL || 'https://quailflow.app/order-success.html';
+// QuailFlow purchases are disabled unless an operator explicitly enables them.
+const quailFlowSalesEnabled = process.env.QUAILFLOW_SALES_ENABLED === 'true';
 const quailFlowFlatShippingCents = Math.max(0, Number.parseInt(process.env.QUAILFLOW_STORE_FLAT_SHIPPING_CENTS || process.env.STORE_FLAT_SHIPPING_CENTS || '0', 10));
 const rabbitFlowStoreSuccessURL = process.env.RABBITFLOW_STORE_SUCCESS_URL || 'https://rabbitflow.app/order-success.html';
 const rabbitFlowFlatShippingCents = Math.max(0, Number.parseInt(process.env.RABBITFLOW_STORE_FLAT_SHIPPING_CENTS || process.env.STORE_FLAT_SHIPPING_CENTS || '0', 10));
@@ -66,7 +68,7 @@ function cors(req,res,next){
 }
 app.use(cors);
 
-app.get('/health', (_, res) => res.json({ ok: true, environment: isProduction ? 'production' : 'sandbox', storeCheckout: true, yardPatrolCheckout: true }));
+app.get('/health', (_, res) => res.json({ ok: true, environment: isProduction ? 'production' : 'sandbox', storeCheckout: true, quailFlowStoreCheckout: quailFlowSalesEnabled, yardPatrolCheckout: true }));
 app.get('/square/config', (_, res) => res.json({ environment: isProduction ? 'production' : 'sandbox', locationIDConfigured: Boolean(configuredLocationID), maxPaymentCents }));
 
 installKennelFlowOrderNotificationRoutes(app,{
@@ -137,6 +139,9 @@ app.post('/store/create-checkout', async (req,res) => {
 
 
 app.post('/quailflow/store/create-checkout', async (req,res) => {
+  if (!quailFlowSalesEnabled) {
+    return res.status(503).json({ error: 'QuailFlow purchases are temporarily disabled. Please check back later.' });
+  }
   try {
     const rawItems=Array.isArray(req.body?.items)?req.body.items:[];
     const buyer=req.body?.buyer||{};
