@@ -1,28 +1,101 @@
 import http from 'node:http';
 import {readFile} from 'node:fs/promises';
-import {randomBytes} from 'node:crypto';
-const PORT=Number(process.env.PORT||4173);
+import {randomBytes, createHash} from 'node:crypto';
+import {fileURLToPath} from 'node:url';
+import {canWrite, collections, uuid, validateModel} from './records.mjs';
 const BACKEND='https://br-long-night-b5uhw0hi-kennelflowapi.compute.c-7.us-east-2.aws.neon.tech';
-const sessions=new Map();
-const secure=process.env.NODE_ENV==='production';
-const cookies=(req)=>Object.fromEntries((req.headers.cookie||'').split(';').map(x=>x.trim().split('=')));
-const session=(req)=>sessions.get(cookies(req).kf_session);
-const send=(res,status,body,extra={})=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...extra});res.end(JSON.stringify(body))};
-const body=async(req)=>{let data='';for await(const chunk of req){data+=chunk;if(data.length>16384)throw Error('Too large')}return JSON.parse(data)};
-const upstream=async(path,token,method='GET',payload)=>{const response=await fetch(BACKEND+path,{method,headers:{'Accept':'application/json',...(token?{'Authorization':'Bearer '+token}:{}),...(payload?{'Content-Type':'application/json'}:{})},body:payload?JSON.stringify(payload):undefined,redirect:'manual',signal:AbortSignal.timeout(12000)});if(response.status>=300&&response.status<400)throw Error('Redirect blocked');return {status:response.status,data:await response.json().catch(()=>({}))}};
-const allowed=(req)=>{const origin=req.headers.origin;return !origin||new URL(origin).host===req.headers.host};
-http.createServer(async(req,res)=>{try{
-const url=new URL(req.url,'http://localhost');const path=url.pathname;
-if(path==='/'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Frame-Options':'DENY','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'"});res.end(await readFile(new URL('./index.html',import.meta.url)));return}
-if(path==='/app.js'){res.writeHead(200,{'Content-Type':'text/javascript','Cache-Control':'no-store'});res.end(await readFile(new URL('./app.js',import.meta.url)));return}
-if(path==='/health'){return send(res,200,{ok:true})}
-if(!path.startsWith('/api/'))return send(res,404,{error:'Not found'});
-if(!allowed(req))return send(res,403,{error:'Origin not allowed'});
-if(path==='/api/login'&&req.method==='POST'){const {email,password}=await body(req);if(typeof email!=='string'||typeof password!=='string'||email.length>254||password.length>512)return send(res,400,{error:'Invalid credentials'});const r=await upstream('/v2/login',null,'POST',{email,password});if(r.status!==200||!r.data.token)return send(res,401,{error:'Invalid credentials'});const id=randomBytes(32).toString('hex');sessions.set(id,{token:r.data.token,created:Date.now()});return send(res,200,{ok:true},{'Set-Cookie':'kf_session='+id+'; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800'+(secure?'; Secure':'')})}
-if(path==='/api/logout'&&req.method==='POST'){sessions.delete(cookies(req).kf_session);return send(res,200,{ok:true},{'Set-Cookie':'kf_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'+(secure?'; Secure':'')})}
-const s=session(req);if(!s||Date.now()-s.created>28800000)return send(res,401,{error:'Sign in required'});
-if(path==='/api/me'&&req.method==='GET'){const r=await upstream('/v2/me',s.token);return send(res,r.status===200?200:401,r.data)}
-if(path==='/api/kennels'&&req.method==='GET'){const r=await upstream('/v2/kennels',s.token);return send(res,r.status===200?200:403,r.data)}
-if(path==='/api/records'&&req.method==='GET'){const kennel=url.searchParams.get('kennel')||'';if(!/^[a-f0-9-]{36}$/i.test(kennel))return send(res,400,{error:'Invalid kennel'});const membership=await upstream('/v2/kennels',s.token);if(membership.status!==200||!membership.data.kennels?.some(k=>k.id?.toLowerCase()===kennel.toLowerCase()))return send(res,403,{error:'Not authorized for kennel'});const cursor=url.searchParams.get('cursor');const r=await upstream('/v2/kennels/'+kennel+'/records'+(cursor?'?cursor='+encodeURIComponent(cursor):''),s.token);return send(res,r.status===200?200:502,r.data)}
-return send(res,404,{error:'Not found'});
-}catch(e){return send(res,503,{error:'Service unavailable'})}}).listen(PORT,()=>console.log('KennelFlow Web read-only server listening on '+PORT));
+const SESSION_MS=28800000;
+const fail=(status,message)=>Object.assign(Error(message),{status});
+export function createWebServer({backend=BACKEND,fetcher=fetch,secure=process.env.RENDER==='true'||process.env.NODE_ENV==='production'}={}) {
+  const sessions=new Map();
+  const cookieID=req=>/(?:^|;\s*)kf_session=([a-f0-9]{64})(?:;|$)/.exec(req.headers.cookie||'')?.[1];
+  const cookie=(id,age)=>`kf_session=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${age}${secure?'; Secure':''}`;
+  const send=(res,status,data,extra={})=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...extra});res.end(JSON.stringify(data))};
+  async function read(req,limit=1048576) {
+    const chunks=[];let size=0;
+    for await(const chunk of req){size+=chunk.length;if(size>limit)throw fail(413,'Request too large');chunks.push(chunk)}
+    return Buffer.concat(chunks);
+  }
+  async function json(req,limit) {
+    if(!/^application\/json(?:;|$)/i.test(req.headers['content-type']||''))throw fail(415,'JSON required');
+    const value=JSON.parse((await read(req,limit)).toString('utf8')||'{}');
+    if(!value||typeof value!=='object'||Array.isArray(value))throw fail(400,'JSON object required');
+    return value;
+  }
+  async function upstream(path,token,method='GET',data,binary=false) {
+    const r=await fetcher(backend+path,{method,headers:{Accept:'application/json',...(token?{Authorization:'Bearer '+token}:{}),...(data!==undefined?{'Content-Type':binary?'application/octet-stream':'application/json'}:{}),...(binary&&data?{'X-Content-SHA256':createHash('sha256').update(data).digest('hex')}:{})},body:data===undefined?undefined:binary?data:JSON.stringify(data),redirect:'manual',signal:AbortSignal.timeout(20000)});
+    if(r.status>=300&&r.status<400)throw fail(502,'Cloud redirect blocked');
+    return r;
+  }
+  const forward=async(res,r)=>send(res,r.status,await r.json().catch(()=>({error:'Invalid cloud response'})));
+  async function membership(token,kennel) {
+    const r=await upstream('/v2/me',token);
+    if(r.status!==200)throw fail(r.status===401?401:503,r.status===401?'Sign in again':'Could not verify kennel access');
+    const k=(await r.json()).kennels?.find(k=>k.id?.toLowerCase()===kennel);
+    if(!k||!['owner','admin','staff','viewer'].includes(k.role))throw fail(403,'No access to this kennel');
+    return k;
+  }
+  const files={'/':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','text/javascript'],'/records.mjs':['records.mjs','text/javascript'],'/schema.mjs':['schema.mjs','text/javascript'],'/styles.css':['styles.css','text/css']};
+  return http.createServer(async(req,res)=>{try{
+    const url=new URL(req.url,'http://localhost'),path=url.pathname;
+    res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');
+    if(Object.hasOwn(files,path)&&['GET','HEAD'].includes(req.method)){
+      const [file,type]=files[path];res.writeHead(200,{'Content-Type':type,'Cache-Control':'no-store','X-Frame-Options':'DENY','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' blob: data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"});res.end(req.method==='HEAD'?undefined:await readFile(new URL(file,import.meta.url)));return;
+    }
+    if(path==='/health'&&req.method==='GET')return send(res,200,{ok:true,version:'web-management-1'});
+    if(!path.startsWith('/api/'))return send(res,404,{error:'Not found'});
+    const unsafe=!['GET','HEAD'].includes(req.method),origin=req.headers.origin;
+    if(origin){let parsed;try{parsed=new URL(origin)}catch{throw fail(403,'Origin not allowed')}if(parsed.host!==req.headers.host||!['http:','https:'].includes(parsed.protocol))throw fail(403,'Origin not allowed')}
+    if(unsafe&&(!origin||req.headers['sec-fetch-site']==='cross-site'))throw fail(403,'Open this page again before saving');
+    if(path==='/api/login'&&req.method==='POST'){
+      const {email,password}=await json(req,16384);
+      if(typeof email!=='string'||typeof password!=='string'||email.length>254||password.length>256)throw fail(400,'Email and password required');
+      const r=await upstream('/v2/login',null,'POST',{email,password}),value=await r.json();
+      if(r.status!==200||!/^[a-f0-9]{64}$/.test(value.token||''))return send(res,r.status===200?502:r.status,{error:value.error||'Could not sign in'});
+      for(const [id,s] of sessions)if(Date.now()-s.created>SESSION_MS)sessions.delete(id);
+      if(sessions.size>=10000)throw fail(503,'Please try again shortly');
+      sessions.delete(cookieID(req));const id=randomBytes(32).toString('hex');sessions.set(id,{token:value.token,created:Date.now()});
+      return send(res,200,{ok:true},{'Set-Cookie':cookie(id,28800)});
+    }
+    const id=cookieID(req),s=sessions.get(id);
+    if(path==='/api/logout'&&req.method==='POST'){
+      sessions.delete(id);if(s)try{await upstream('/v2/logout',s.token,'POST',{})}catch{}
+      return send(res,200,{ok:true},{'Set-Cookie':cookie('',0)});
+    }
+    if(!s||Date.now()-s.created>SESSION_MS){sessions.delete(id);return send(res,401,{error:'Sign in required'})}
+    if(path==='/api/me'&&req.method==='GET')return forward(res,await upstream('/v2/me',s.token));
+    if(path==='/api/kennels'&&req.method==='GET'){const r=await upstream('/v2/me',s.token);const value=await r.json();return send(res,r.status,r.status===200?{kennels:value.kennels}:value)}
+    if(path==='/api/records'&&req.method==='GET'){
+      const kennel=(url.searchParams.get('kennel')||'').toLowerCase(),cursor=url.searchParams.get('cursor');
+      if(!uuid(kennel)||cursor?.length>2048)throw fail(400,'Invalid kennel or page');
+      await membership(s.token,kennel);
+      return forward(res,await upstream('/v2/kennels/'+kennel+'/records'+(cursor?'?cursor='+encodeURIComponent(cursor):''),s.token));
+    }
+    const match=/^\/api\/kennels\/([^/]+)\/(records|files)(?:\/([^/]+))?$/.exec(path);
+    if(match){
+      const kennel=match[1].toLowerCase(),resource=match[2],recordID=match[3]?.toLowerCase();
+      if(!uuid(kennel)||!uuid(recordID))throw fail(400,'Invalid record address');
+      const k=await membership(s.token,kennel);
+      if(resource==='records'&&req.method==='PUT'){
+        const input=await json(req);
+        if(!canWrite(k.role,input.type))throw fail(403,'Your account cannot edit this type of record');
+        if(!Number.isSafeInteger(input.expectedRevision)||input.expectedRevision<0||String(input.record?.id).toLowerCase()!==recordID)throw fail(400,'Invalid record identity or revision');
+        const error=validateModel(collections[input.type],input.record);if(error)throw fail(400,error);
+        if(input.deletedAt!=null&&(typeof input.deletedAt!=='string'||!Number.isFinite(Date.parse(input.deletedAt))))throw fail(400,'Invalid deletion date');
+        const payload={type:input.type,expectedRevision:input.expectedRevision,data:{platform:'ios',collection:input.type,record:input.record},...(input.deletedAt?{deletedAt:input.deletedAt}:{})};
+        return forward(res,await upstream(`/v2/kennels/${kennel}/records/${recordID}`,s.token,'PUT',payload));
+      }
+      if(resource==='files'&&['GET','PUT'].includes(req.method)){
+        if(!['owner','admin'].includes(k.role))throw fail(403,'Your account cannot access documents');
+        const content=req.method==='PUT'?await read(req,10485760):undefined;
+        const r=await upstream(`/v2/kennels/${kennel}/files/${recordID}`,s.token,req.method,content,true);
+        if(req.method==='PUT'||r.status!==200)return forward(res,r);
+        const bytes=Buffer.from(await r.arrayBuffer()),hash=r.headers.get('x-content-sha256');
+        if(bytes.length>10485760||createHash('sha256').update(bytes).digest('hex')!==hash)throw fail(502,'Document integrity check failed');
+        res.writeHead(200,{'Content-Type':'application/octet-stream','Content-Disposition':`attachment; filename="${recordID}"`,'Cache-Control':'no-store','X-Content-SHA256':hash});res.end(bytes);return;
+      }
+    }
+    return send(res,404,{error:'Not found'});
+  }catch(e){if(!res.headersSent)send(res,e.status||(e instanceof SyntaxError?400:503),{error:e.status?e.message:e instanceof SyntaxError?'Invalid JSON':'Cloud unavailable. Your unsaved form remains open.'});else res.end()}});
+}
+if(process.argv[1]===fileURLToPath(import.meta.url))createWebServer().listen(Number(process.env.PORT||4173),'0.0.0.0',()=>console.log('KennelFlow Web management server started'));

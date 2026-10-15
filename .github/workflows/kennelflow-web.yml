@@ -1,0 +1,21 @@
+name: KennelFlow Web checks
+on:
+  push:
+    paths: ['KennelFlowWeb/**', '.github/workflows/kennelflow-web.yml']
+  pull_request:
+    paths: ['KennelFlowWeb/**', '.github/workflows/kennelflow-web.yml']
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: KennelFlowWeb
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: KennelFlowWeb/package-lock.json
+      - run: npm ci
+      - run: npm test
