@@ -10,5 +10,3 @@ $('loginForm').addEventListener('submit',async e=>{e.preventDefault();try{error(
 $('logout').addEventListener('click',async()=>{await api('logout',{method:'POST'});rows=[];cursor=null;await init()});
 $('kennel').addEventListener('change',()=>load());$('refresh').addEventListener('click',()=>load());$('more').addEventListener('click',()=>load(true));
 for(const name of Object.keys(types)){const b=document.createElement('button');b.textContent=name.replace('_',' / ');b.addEventListener('click',()=>{active=name;document.querySelectorAll('#nav button').forEach(n=>n.classList.toggle('active',n===b));display()});$('nav').append(b)}document.querySelector('#nav button').classList.add('active');init();
-
-[executed on device: Antonios-MacBook-Air.local (84400095-510b-4cac-aa2c-4d1a0a59d3ba)]
