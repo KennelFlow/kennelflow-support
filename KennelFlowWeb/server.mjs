@@ -26,5 +26,3 @@ if(path==='/api/kennels'&&req.method==='GET'){const r=await upstream('/v2/kennel
 if(path==='/api/records'&&req.method==='GET'){const kennel=url.searchParams.get('kennel')||'';if(!/^[a-f0-9-]{36}$/i.test(kennel))return send(res,400,{error:'Invalid kennel'});const membership=await upstream('/v2/kennels',s.token);if(membership.status!==200||!membership.data.kennels?.some(k=>k.id?.toLowerCase()===kennel.toLowerCase()))return send(res,403,{error:'Not authorized for kennel'});const cursor=url.searchParams.get('cursor');const r=await upstream('/v2/kennels/'+kennel+'/records'+(cursor?'?cursor='+encodeURIComponent(cursor):''),s.token);return send(res,r.status===200?200:502,r.data)}
 return send(res,404,{error:'Not found'});
 }catch(e){return send(res,503,{error:'Service unavailable'})}}).listen(PORT,()=>console.log('KennelFlow Web read-only server listening on '+PORT));
-
-[executed on device: Antonios-MacBook-Air.local (84400095-510b-4cac-aa2c-4d1a0a59d3ba)]
