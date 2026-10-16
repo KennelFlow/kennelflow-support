@@ -155,7 +155,19 @@ export function createWebServer({backend=BACKEND,fetcher=fetch,secure=process.en
         const error=validateModel(collections.payments,record);
         if(error)throw fail(400,error);
         const saved=await upstream('/v2/kennels/'+scope+'/records/'+identifier,s.token,'PUT',{type:'payments',expectedRevision:0,data:{platform:'ios',collection:'payments',record}});
-        if(saved.status===409)return send(res,409,{paid:true,status:'COMPLETED',orderID:verifiedOrderID,paymentID:data.paymentID,environment:paymentStatus[2]?'sandbox':'production',saved:false,error:'Square confirmed payment, but KennelFlow could not verify whether the cloud record already exists. No duplicate record was created.'});
+        if(saved.status===409){
+          // A write conflict only means "already recorded" when the exact Square payment
+          // is already present at the deterministic ID. Never assume all conflicts are duplicates.
+          const prior=await upstream('/v2/kennels/'+scope+'/records/'+identifier,s.token);
+          if(prior.status===200){
+            const found=await prior.json().catch(()=>null);
+            const existing=found?.data?.record||found?.record||found?.data?.data?.record;
+            if(existing?.reference===data.paymentID&&existing?.method===method&&Number(existing?.amount)===amountCents/100){
+              return send(res,200,{paid:true,status:'COMPLETED',orderID:verifiedOrderID,paymentID:data.paymentID,environment:paymentStatus[2]?'sandbox':'production',saved:false,alreadyRecorded:true});
+            }
+          }
+          return send(res,409,{paid:true,status:'COMPLETED',orderID:verifiedOrderID,paymentID:data.paymentID,saved:false,error:'Square confirmed payment, but KennelFlow could not verify the existing cloud record. Check payment history before retrying.'});
+        }
         if(saved.status!==200&&saved.status!==201)return send(res,502,{paid:true,error:'Square confirmed payment, but KennelFlow could not save the record'});
         return send(res,200,{paid:true,status:'COMPLETED',orderID,paymentID:data.paymentID,environment:paymentStatus[2]?'sandbox':'production',saved:true,alreadyRecorded:false});
       }
