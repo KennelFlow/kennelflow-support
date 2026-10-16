@@ -152,7 +152,22 @@ function renderSpecialized(type,list){
         submit.disabled=true;feedback.textContent='Requesting checkout securely…';
         try{const data=await api('kennels/'+kennel+'/square-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amountCents,customerName:customer.value,description:detail.value,reference:reference.value})});
           feedback.replaceChildren(el('span','Checkout link created. Payment is not yet confirmed. Share this link with the customer: '));
-          const anchor=el('a','Open Square checkout');anchor.href=data.url;anchor.target='_blank';anchor.rel='noopener noreferrer';feedback.append(anchor);
+          const anchor=el('a','Open Square checkout');anchor.href=data.url;anchor.target='_self';anchor.rel='noopener noreferrer';feedback.append(anchor);
+          const liveStatus=el('p','Payment not yet verified.');
+          liveStatus.setAttribute('role','status');liveStatus.setAttribute('aria-live','polite');
+          const liveVerify=button('Verify live Square payment',async()=>{
+            if(liveVerify.disabled)return;
+            liveVerify.disabled=true;liveVerify.textContent='Checking Square…';
+            liveStatus.textContent='Checking payment status securely…';
+            const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),25000);
+            try{
+              const verified=await api('kennels/'+kennel+'/square-status',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({orderID:data.orderID,amountCents,customerName:customer.value})});
+              liveStatus.textContent=verified.paid?(verified.saved?'Payment confirmed and saved in KennelFlow.':verified.alreadyRecorded?'Payment previously recorded.':'Square confirmed payment; KennelFlow save not confirmed.'):'No completed payment yet. Status: '+(verified.status||'unknown');
+              if(verified.saved)await load(true);
+            }catch(error){liveStatus.textContent=error.name==='AbortError'?'Payment verification timed out. Retry in a moment.':'Payment verification failed: '+error.message}
+            finally{clearTimeout(timer);liveVerify.disabled=false;liveVerify.textContent='Verify live Square payment'}
+          });
+          feedback.append(liveVerify,liveStatus);
         }catch(e){feedback.textContent='LIVE Square payments error: '+e.message+'. This is separate from sandbox testing.'}finally{submit.disabled=false}
       });
       const sandboxButton=button('Create sandbox test checkout',async()=>{
