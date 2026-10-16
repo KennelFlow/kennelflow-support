@@ -101,7 +101,7 @@ app.post('/kennelflow/checkout', async (req,res)=>{
       method:'POST',headers:{Authorization:'Bearer '+accessToken,'Square-Version':squareApiVersion,'Content-Type':'application/json'},body:JSON.stringify(bodySquare)
     });
     const data=await sq.json();
-    if(!sq.ok)return res.status(502).json({error:data?.errors?.[0]?.detail||'Square checkout failed'});
+    if(!sq.ok){const issue=data?.errors?.[0]||{};console.warn('KennelFlow Square checkout rejected',{environment:isProduction?'production':'sandbox',httpStatus:sq.status,code:issue.code||'UNKNOWN',category:issue.category||'UNKNOWN'});return res.status(502).json({error:'Square rejected checkout ('+(issue.code||'UNKNOWN')+'): '+(issue.detail||'Contact Square support'),squareCode:issue.code||'UNKNOWN'});}
     const url=data?.payment_link?.url||data?.payment_link?.long_url;
     if(typeof url!=='string'||!url.startsWith('https://'))return res.status(502).json({error:'Invalid Square checkout link'});
     return res.json({url,orderID:data.payment_link.order_id||'',status:'AWAITING_CUSTOMER_PAYMENT'});
