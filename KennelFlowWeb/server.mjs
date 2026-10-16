@@ -127,6 +127,25 @@ export function createWebServer({backend=BACKEND,fetcher=fetch,secure=process.en
       if(!/^https:\/\//.test(data.url||''))throw fail(502,'Invalid checkout URL');
       return send(res,200,{url:data.url,orderID:data.orderID||'',status:'AWAITING_CUSTOMER_PAYMENT'});
     }
+    const paymentStatus=/^\/api\/kennels\/([^/]+)\/square-(sandbox-)?status$/.exec(path);
+    if(paymentStatus&&req.method==='POST'){
+      const scope=paymentStatus[1].toLowerCase();
+      if(!uuid(scope))throw fail(400,'Invalid kennel');
+      const member=await membership(s.token,scope);
+      if(!['owner','admin'].includes(member.role))throw fail(403,'Only owner/admin may verify payments');
+      const {orderID,amountCents}=await json(req,16384);
+      if(typeof orderID!=='string'||!orderID||orderID.length>192||!Number.isSafeInteger(amountCents)||amountCents<100)throw fail(400,'Invalid payment lookup');
+      const secret=process.env.KENNELFLOW_CHECKOUT_SECRET;
+      if(!secret||secret.length<32)throw fail(503,'Payment verification not configured');
+      const body=JSON.stringify({orderID,amountCents});
+      const stamp=String(Date.now()),signature=createHmac('sha256',secret).update(stamp+'.'+body).digest('hex');
+      const dest=paymentStatus[2]?'https://kennelflow-square-sandbox.onrender.com':'https://kennelflow-payments.onrender.com';
+      const result=await fetcher(dest+'/kennelflow/checkout-status',{method:'POST',headers:{'Content-Type':'application/json','X-KF-Timestamp':stamp,'X-KF-Signature':signature},body,redirect:'manual',signal:AbortSignal.timeout(20000)});
+      if(result.status>=300&&result.status<400)throw fail(502,'Payment redirect blocked');
+      const data=await result.json().catch(()=>({error:'Invalid response'}));
+      if(!result.ok)return send(res,result.status,{error:data.error||'Payment verification failed'});
+      return send(res,200,{paid:data.paid===true,status:data.status,orderID:data.orderID,paymentID:data.paymentID||'',environment:paymentStatus[2]?'sandbox':'production'});
+    }
     if(path==='/api/records'&&req.method==='GET'){
       const kennel=(url.searchParams.get('kennel')||'').toLowerCase(),cursor=url.searchParams.get('cursor');
       if(!uuid(kennel)||cursor?.length>2048)throw fail(400,'Invalid kennel or page');
