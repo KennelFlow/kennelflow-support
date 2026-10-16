@@ -1,3 +1,4 @@
+import {putCheckout,getCheckouts,cloudReady} from './kennelflow-cloud-payments.js';
 import express from 'express';
 import crypto from 'crypto';
 import { Client, Environment } from 'square/legacy';
@@ -148,7 +149,8 @@ app.post('/kennelflow/checkout', async (req,res)=>{
     if(!sq.ok){const issue=data?.errors?.[0]||{};console.warn('KennelFlow Square checkout rejected',{environment:isProduction?'production':'sandbox',httpStatus:sq.status,code:issue.code||'UNKNOWN',category:issue.category||'UNKNOWN'});return res.status(502).json({error:'Square rejected checkout ('+(issue.code||'UNKNOWN')+'): '+(issue.detail||'Contact Square support'),squareCode:issue.code||'UNKNOWN'});}
     const url=data?.payment_link?.url||data?.payment_link?.long_url;
     if(typeof url!=='string'||!url.startsWith('https://'))return res.status(502).json({error:'Invalid Square checkout link'});
-    return res.json({url,orderID:data.payment_link.order_id||'',status:'AWAITING_CUSTOMER_PAYMENT'});
+    if(cloudReady())await putCheckout({orderID:data.payment_link.order_id,kennelID,environment:isProduction?'production':'sandbox',customerName,amountCents,reference,url});
+    return res.json({url,orderID:data.payment_link.order_id||'',status:'AWAITING_CUSTOMER_PAYMENT',cloudSaved:cloudReady()});
   }catch(e){return res.status(502).json({error:'Unable to create checkout'})}
 });
 app.post('/kennelflow/checkout-status',async(req,res)=>{
