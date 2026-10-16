@@ -161,7 +161,15 @@ function renderSpecialized(type,list){
         sandboxButton.disabled=true;
         try{const data=await api('kennels/'+kennel+'/square-sandbox-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amountCents,customerName:customer.value,description:detail.value,reference:reference.value})});
           feedback.replaceChildren(el('strong','SANDBOX ONLY — no real money. '));
-          const link=el('a','Open test checkout');link.href=data.url;link.target='_blank';link.rel='noopener noreferrer';feedback.append(link);
+          const link=el('a','Open test checkout');link.href=data.url;link.target='_self';link.rel='noopener noreferrer';feedback.append(link);
+          feedback.append(el('span',' (opens in this browser) '));
+          const copyLink=button('Copy test checkout link',async()=>{
+            try{
+              if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(data.url);message('Test checkout link copied. Paste it into Safari if this browser does not open the link.');}
+              else{message('To open in Safari, press and hold the checkout link, then choose Copy Link.');}
+            }catch{message('Press and hold the checkout link, choose Copy Link, and paste it into Safari.');}
+          });
+          feedback.append(copyLink);
           const check=button('Verify Square test payment',async()=>{
             try{const v=await api('kennels/'+kennel+'/square-sandbox-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderID:data.orderID,amountCents,customerName:customer.value})});
               message(v.paid?'Square confirmed sandbox payment COMPLETED (ID '+v.paymentID+'). '+(v.saved?'TEST record saved to KennelFlow.':v.alreadyRecorded?'TEST record already exists.':'Payment verified.'):'Square has not confirmed a completed payment. Status: '+v.status);if(v.saved)await load(true);
