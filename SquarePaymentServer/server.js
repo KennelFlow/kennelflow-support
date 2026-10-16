@@ -189,6 +189,51 @@ app.post('/kennelflow/checkout-status',async(req,res)=>{
     return res.json({paid,paymentID,orderID,status:paid?'COMPLETED':String(order?.state||'PENDING'),environment:isProduction?'production':'sandbox'});
   }catch{return res.status(502).json({error:'Square payment verification failed'})}
 });
+// Recover an already completed KennelFlow checkout by merchant reference.
+// Only signed calls can use this route, and a payment must be tied to the caller's kennel.
+app.post('/kennelflow/recover-payment',async(req,res)=>{
+  try{
+    const secret=process.env.KENNELFLOW_CHECKOUT_SECRET;
+    const stamp=req.header('X-KF-Timestamp')||'',sig=req.header('X-KF-Signature')||'';
+    if(!secret||secret.length<32)return res.status(503).json({error:'Secure payment recovery unavailable'});
+    if(!/^\\d{13}$/.test(stamp)||Math.abs(Date.now()-Number(stamp))>120000||!/^[a-f0-9]{64}$/.test(sig))return res.status(403).json({error:'Unauthorized'});
+    const expected=crypto.createHmac('sha256',secret).update(stamp+'.'+(req.rawBody||JSON.stringify(req.body))).digest('hex');
+    if(!crypto.timingSafeEqual(Buffer.from(sig,'hex'),Buffer.from(expected,'hex')))return res.status(403).json({error:'Unauthorized'});
+    const {kennelID,reference,amountCents}=req.body||{};
+    if(!/^[a-f0-9-]{36}$/i.test(kennelID||'')||typeof reference!=='string'||!reference.trim()||reference.length>120||!Number.isSafeInteger(amountCents)||amountCents<100||amountCents>maxPaymentCents)return res.status(400).json({error:'Invalid payment recovery details'});
+    const headers={Authorization:'Bearer '+accessToken,'Square-Version':squareApiVersion};
+    const begin=new Date(Date.now()-30*86400000).toISOString();
+    let cursor='',match=null,matchingCount=0,pages=0;
+    do{
+      const params=new URLSearchParams({begin_time:begin,location_id:configuredLocationID,sort_order:'DESC',limit:'100'});
+      if(cursor)params.set('cursor',cursor);
+      const response=await fetch(squareApiBase+'/v2/payments?'+params,{headers});
+      const payload=await response.json();
+      if(!response.ok)return res.status(502).json({error:'Square payment search failed',squareCode:payload.errors?.[0]?.code||'UNKNOWN'});
+      for(const payment of payload.payments||[]){
+        if(payment.status!=='COMPLETED'||payment.location_id!==configuredLocationID||Number(payment.amount_money?.amount)!==amountCents||!payment.order_id)continue;
+        const orderRes=await fetch(squareApiBase+'/v2/orders/'+encodeURIComponent(payment.order_id),{headers});
+        if(!orderRes.ok)continue;
+        const order=(await orderRes.json()).order;
+        if(order?.location_id!==configuredLocationID||Number(order?.total_money?.amount)!==amountCents||!order.line_items?.some(x=>x.name==='KennelFlow service payment'))continue;
+        const combined=[payment.note||'',order.note||''].join(' • ');
+        // Checkout notes contain "KennelFlow Business • <kennel UUID> • customer • description • reference".
+        const parts=combined.split(' • ').map(x=>x.trim());
+        const base=parts.findIndex(x=>x==='KennelFlow Business');
+        if(base<0||parts[base+1]?.toLowerCase()!==kennelID.toLowerCase()||parts[base+parts.length-1]===undefined)continue;
+        if(!parts.slice(base+2).includes(reference.trim()))continue;
+        matchingCount++;
+        match={paid:true,status:'COMPLETED',orderID:payment.order_id,paymentID:payment.id,amountCents,environment:isProduction?'production':'sandbox'};
+        if(matchingCount>1)break;
+      }
+      if(matchingCount>1)break;
+      cursor=payload.cursor||'';pages++;
+    }while(cursor&&pages<10);
+    if(matchingCount>1)return res.status(409).json({error:'More than one matching payment found. Narrow the reference to a unique value.'});
+    if(!match)return res.status(404).json({error:'No completed Square payment matched this kennel, amount, and reference in the last 30 days.'});
+    return res.json(match);
+  }catch(e){console.warn('KennelFlow payment recovery error',{name:e?.name||'unknown'});return res.status(502).json({error:'Could not recover Square payment'})}
+});
 app.post('/square/create-payment', async (req, res) => {
   try {
     const { sourceID, locationID, amountCents, currency='USD', customerName='', description='', idempotencyKey:clientIdempotencyKey='' } = req.body ?? {};
