@@ -40,6 +40,21 @@ export function validateValue(field, value, key = field.key) {
   const valid = field.type === 'String' ? typeof value === 'string' && value.length <= 250000 : field.type === 'UUID' ? uuid(value) : field.type === 'Bool' ? typeof value === 'boolean' : field.type === 'Date' ? typeof value === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(value) && Number.isFinite(Date.parse(value)) : ['Int','Int64'].includes(field.type) ? Number.isSafeInteger(value) : field.type === 'Double' ? typeof value === 'number' && Number.isFinite(value) : false;
   return valid ? null : key + ' has an invalid value';
 }
+const numericNameSorter = new Intl.Collator(undefined, {numeric:true,sensitivity:'base'});
+const directoryTypes = new Set(['dogs','puppies','litters','kennels','equipment','clients','customers',
+ 'scanFolders','inventoryLocations','inventoryItems','smartPlacements','smartTags','clinics',
+ 'employeeProfiles','dailyDutyTemplates','dailyDutyShifts','feedingPlans','supplementRecords']);
+export function compareDisplayRecords(a,b,type) {
+ // Directory-style lists sort naturally (Run 2 before Run 10) without changing
+ // the underlying IDs, cloud revisions, or date-based activity ledgers.
+ if(directoryTypes.has(type)) {
+   const first=recordName(a.record),second=recordName(b.record);
+   const byName=numericNameSorter.compare(first,second);
+   if(byName!==0)return byName;
+ }
+ const byDate=String(b.updated_at||'').localeCompare(String(a.updated_at||''));
+ return byDate!==0?byDate:String(a.id||'').localeCompare(String(b.id||''));
+}
 export function recordName(record) {
   return record?.name || record?.callName || record?.title || record?.taskTitle || record?.petName || record?.subjectName || record?.dogName || record?.customerName || record?.staffName || record?.expenseDescription || record?.litterName || 'Untitled record';
 }
