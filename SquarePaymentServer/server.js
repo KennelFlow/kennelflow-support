@@ -94,7 +94,31 @@ app.post('/kennelflow/checkout', async (req,res)=>{
        typeof customerName!=='string'||!customerName.trim()||customerName.length>120||
        typeof description!=='string'||description.length>250||typeof reference!=='string'||reference.length>120||
        !/^[a-f0-9]{32}$/.test(requestID||''))return res.status(400).json({error:'Invalid checkout details'});
-    const bodySquare={idempotency_key:requestID,order:{location_id:configuredLocationID,line_items:[{
+    // Sandbox credentials can be regenerated for a different Square application.
+    // Resolve the sandbox location from Square rather than trusting a stale Render value.
+    let checkoutLocationID=configuredLocationID;
+    if(!isProduction){
+      const locationsResponse=await fetch(squareApiBase+'/v2/locations',{
+        headers:{Authorization:'Bearer '+accessToken,'Square-Version':squareApiVersion}
+      });
+      const locationsData=await locationsResponse.json();
+      if(!locationsResponse.ok){
+        const issue=locationsData?.errors?.[0]||{};
+        console.warn('KennelFlow sandbox location lookup rejected',{httpStatus:locationsResponse.status,code:issue.code||'UNKNOWN'});
+        return res.status(502).json({error:'Square sandbox location lookup failed ('+(issue.code||'UNKNOWN')+'). Check the sandbox credentials.'});
+      }
+      const available=(locationsData.locations||[]).filter(location=>location.status==='ACTIVE'&&location.id);
+      const configured=available.find(location=>location.id===configuredLocationID);
+      if(configured)checkoutLocationID=configured.id;
+      else if(available.length===1){
+        checkoutLocationID=available[0].id;
+        console.info('KennelFlow sandbox selected the sole active location for the connected Square application');
+      }else{
+        console.warn('KennelFlow sandbox location cannot be resolved',{activeLocationCount:available.length});
+        return res.status(409).json({error:'Square sandbox location mismatch. The connected Square application has '+available.length+' active locations; update SQUARE_SANDBOX_LOCATION_ID in Render to an active location in that application.'});
+      }
+    }
+    const bodySquare={idempotency_key:requestID,order:{location_id:checkoutLocationID,line_items:[{
       name:'KennelFlow service payment',quantity:'1',base_price_money:{amount:amountCents,currency:'USD'}
     }]},payment_note:['KennelFlow Business',kennelID,customerName,description,reference].filter(Boolean).join(' • ').slice(0,500)};
     const sq=await fetch(squareApiBase+'/v2/online-checkout/payment-links',{
