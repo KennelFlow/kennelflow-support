@@ -30,3 +30,14 @@ test('unknown roles and collections fail closed',()=>{assert.equal(canRead('unkn
 test('staff cannot fetch or upload attachments',async()=>{const f=fixture();assert.equal((await f.call(`/v2/kennels/${kennel}/files/${id}`)).status,403);assert.equal((await f.call(`/v2/kennels/${kennel}/files/${id}`,'PUT',{})).status,403)});
 test('file checksum mismatch rejected before persistence',async()=>{const f=fixture('owner');assert.equal((await f.call(`/v2/kennels/${kennel}/files/${id}`,'PUT',{})).status,400)});
 
+
+test('new professional records are available only to Business owners and admins',async()=>{
+ const types=['maintenanceRecords','ofaXrays','clinics','vetServices','employeeProfiles','messages','locations','pedigreeAncestors','pedigreeScans'];
+ for(const type of types){
+  assert.equal(canRead('owner',type),true,type);assert.equal(canWrite('admin',type),true,type);
+  assert.equal(canRead('staff',type),false,type);assert.equal(canWrite('staff',type),false,type);
+  const f=fixture('owner'),input=record(type);if(type==='maintenanceRecords')input.data.record.kennelID=kennel;
+  assert.equal((await f.call(`/v2/kennels/${kennel}/records/${id}`,'PUT',input)).status,200,type);
+  const limited=fixture('staff');assert.equal((await limited.call(`/v2/kennels/${kennel}/records/${id}`,'PUT',input)).status,403,type);
+ }
+});
