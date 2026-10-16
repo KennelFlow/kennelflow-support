@@ -79,6 +79,34 @@ installKennelFlowOrderNotificationRoutes(app,{
   stores:{ KennelFlow:PRODUCTS, QuailFlow:QUAILFLOW_PRODUCTS, RabbitFlow:RABBITFLOW_PRODUCTS }
 });
 
+// Authenticated KennelFlow Business payment links. Never mark an invoice paid here.
+app.post('/kennelflow/checkout', async (req,res)=>{
+  try{
+    const secret=process.env.KENNELFLOW_CHECKOUT_SECRET;
+    const stamp=req.header('X-KF-Timestamp')||'',sig=req.header('X-KF-Signature')||'';
+    if(!secret||secret.length<32)return res.status(503).json({error:'Secure kennel checkout is unavailable'});
+    if(!/^\\d{13}$/.test(stamp)||Math.abs(Date.now()-Number(stamp))>120000||!/^[a-f0-9]{64}$/.test(sig))return res.status(403).json({error:'Invalid checkout authorization'});
+    const body=JSON.stringify(req.body);
+    const expected=crypto.createHmac('sha256',secret).update(stamp+'.'+body).digest('hex');
+    if(!crypto.timingSafeEqual(Buffer.from(sig,'hex'),Buffer.from(expected,'hex')))return res.status(403).json({error:'Invalid checkout authorization'});
+    const {kennelID,amountCents,customerName,description,reference,requestID}=req.body||{};
+    if(!/^[a-f0-9-]{36}$/i.test(kennelID||'')||!Number.isSafeInteger(amountCents)||amountCents<100||amountCents>maxPaymentCents||
+       typeof customerName!=='string'||!customerName.trim()||customerName.length>120||
+       typeof description!=='string'||description.length>250||typeof reference!=='string'||reference.length>120||
+       !/^[a-f0-9]{32}$/.test(requestID||''))return res.status(400).json({error:'Invalid checkout details'});
+    const bodySquare={idempotency_key:requestID,order:{location_id:configuredLocationID,line_items:[{
+      name:'KennelFlow service payment',quantity:'1',base_price_money:{amount:amountCents,currency:'USD'}
+    }]},payment_note:['KennelFlow Business',kennelID,customerName,description,reference].filter(Boolean).join(' • ').slice(0,500)};
+    const sq=await fetch(squareApiBase+'/v2/online-checkout/payment-links',{
+      method:'POST',headers:{Authorization:'Bearer '+accessToken,'Square-Version':squareApiVersion,'Content-Type':'application/json'},body:JSON.stringify(bodySquare)
+    });
+    const data=await sq.json();
+    if(!sq.ok)return res.status(502).json({error:data?.errors?.[0]?.detail||'Square checkout failed'});
+    const url=data?.payment_link?.url||data?.payment_link?.long_url;
+    if(typeof url!=='string'||!url.startsWith('https://'))return res.status(502).json({error:'Invalid Square checkout link'});
+    return res.json({url,orderID:data.payment_link.order_id||'',status:'AWAITING_CUSTOMER_PAYMENT'});
+  }catch(e){return res.status(502).json({error:'Unable to create checkout'})}
+});
 app.post('/square/create-payment', async (req, res) => {
   try {
     const { sourceID, locationID, amountCents, currency='USD', customerName='', description='', idempotencyKey:clientIdempotencyKey='' } = req.body ?? {};
