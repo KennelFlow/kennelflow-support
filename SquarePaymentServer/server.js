@@ -196,7 +196,7 @@ app.post('/kennelflow/recover-payment',async(req,res)=>{
     const secret=process.env.KENNELFLOW_CHECKOUT_SECRET;
     const stamp=req.header('X-KF-Timestamp')||'',sig=req.header('X-KF-Signature')||'';
     if(!secret||secret.length<32)return res.status(503).json({error:'Secure payment recovery unavailable'});
-    if(!/^\\d{13}$/.test(stamp)||Math.abs(Date.now()-Number(stamp))>120000||!/^[a-f0-9]{64}$/.test(sig))return res.status(403).json({error:'Unauthorized'});
+    if(!/^[0-9]{13}$/.test(stamp)||Math.abs(Date.now()-Number(stamp))>120000||!/^[a-f0-9]{64}$/.test(sig))return res.status(403).json({error:'Unauthorized'});
     const expected=crypto.createHmac('sha256',secret).update(stamp+'.'+(req.rawBody||JSON.stringify(req.body))).digest('hex');
     if(!crypto.timingSafeEqual(Buffer.from(sig,'hex'),Buffer.from(expected,'hex')))return res.status(403).json({error:'Unauthorized'});
     const {kennelID,reference,amountCents}=req.body||{};
