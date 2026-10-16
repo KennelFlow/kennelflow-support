@@ -133,7 +133,8 @@ export function createWebServer({backend=BACKEND,fetcher=fetch,secure=process.en
       if(!uuid(scope))throw fail(400,'Invalid kennel');
       const member=await membership(s.token,scope);
       if(!['owner','admin'].includes(member.role))throw fail(403,'Only owner/admin may verify payments');
-      const {orderID,amountCents}=await json(req,16384);
+      const {orderID,amountCents,customerName}=await json(req,16384);
+      const inputRecord=typeof customerName==='string'&&customerName.trim()&&customerName.length<=120?{customerName:customerName.trim()}:null;
       if(typeof orderID!=='string'||!orderID||orderID.length>192||!Number.isSafeInteger(amountCents)||amountCents<100)throw fail(400,'Invalid payment lookup');
       const secret=process.env.KENNELFLOW_CHECKOUT_SECRET;
       if(!secret||secret.length<32)throw fail(503,'Payment verification not configured');
@@ -144,6 +145,18 @@ export function createWebServer({backend=BACKEND,fetcher=fetch,secure=process.en
       if(result.status>=300&&result.status<400)throw fail(502,'Payment redirect blocked');
       const data=await result.json().catch(()=>({error:'Invalid response'}));
       if(!result.ok)return send(res,result.status,{error:data.error||'Payment verification failed'});
+      if(data.paid===true&&typeof data.paymentID==='string'&&data.paymentID&&inputRecord){
+        // Never record a sandbox transaction as real revenue. Test records carry an explicit method.
+        const recordID=createHash('sha256').update('kf-square-'+(paymentStatus[2]?'sandbox':'production')+'-'+data.paymentID).digest('hex');
+        const identifier=[recordID.slice(0,8),recordID.slice(8,12),'4'+recordID.slice(13,16),'a'+recordID.slice(17,20),recordID.slice(20,32)].join('-');
+        const method=paymentStatus[2]?'Square Sandbox — TEST ONLY':'Square';
+        const record={id:identifier,customerName:inputRecord.customerName,puppyName:'',date:new Date().toISOString(),amount:amountCents/100,method,reference:data.paymentID,notes:'Verified Square order '+orderID+(paymentStatus[2]?' — SANDBOX TEST — NO REAL MONEY':'')};
+        const error=validateModel(collections.payments,record);
+        if(error)throw fail(400,error);
+        const saved=await upstream('/v2/kennels/'+scope+'/records/'+identifier,s.token,'PUT',{type:'payments',expectedRevision:0,data:{platform:'ios',collection:'payments',record}});
+        if(saved.status!==200&&saved.status!==201&&saved.status!==409)return send(res,502,{error:'Square confirmed payment, but KennelFlow could not save the record'});
+        return send(res,200,{paid:true,status:'COMPLETED',orderID,paymentID:data.paymentID,environment:paymentStatus[2]?'sandbox':'production',saved:saved.status!==409,alreadyRecorded:saved.status===409});
+      }
       return send(res,200,{paid:data.paid===true,status:data.status,orderID:data.orderID,paymentID:data.paymentID||'',environment:paymentStatus[2]?'sandbox':'production'});
     }
     if(path==='/api/records'&&req.method==='GET'){
