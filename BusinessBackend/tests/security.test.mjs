@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createAPI, hashPassword, verifyPassword } from '../api.mjs';
+import { createAPI, hashPassword, verifyPassword, normalizeBusinessWebsite } from '../api.mjs';
 import { canManage, canRead, canWrite, validateRecord } from '../policy.mjs';
 const owner='00000000-0000-0000-0000-000000000001',staff='00000000-0000-0000-0000-000000000002',kennel='00000000-0000-0000-0000-000000000003',other='00000000-0000-0000-0000-000000000004',id='00000000-0000-0000-0000-000000000005';
 function fixture(role='staff') {
@@ -9,6 +9,15 @@ function fixture(role='staff') {
  const api=createAPI(repo);const call=(path,method='GET',input)=>api.fetch(new Request('https://example.com'+path,{method,headers:{authorization:'Bearer '+'a'.repeat(64),'content-type':'application/json'},body:input===undefined?undefined:JSON.stringify(input)}));return {state,repo,call};
 }
 const record=(type='tasks',revision=0)=>({type,expectedRevision:revision,data:{platform:'ios',collection:type,record:{id,title:'Care'}}});
+test('business website accepts plain domains and rejects unsafe URLs',()=>{
+ assert.equal(normalizeBusinessWebsite('www.kennelflowpro.app'),'https://www.kennelflowpro.app/');
+ assert.equal(normalizeBusinessWebsite('kennelflowpro.app'),'https://kennelflowpro.app/');
+ assert.equal(normalizeBusinessWebsite('https://kennelflowpro.app/path'),'https://kennelflowpro.app/path');
+ assert.equal(normalizeBusinessWebsite(''),'');
+ assert.equal(normalizeBusinessWebsite('javascript:alert(1)'),null);
+ assert.equal(normalizeBusinessWebsite('https://admin@kennelflowpro.app'),null);
+ assert.equal(normalizeBusinessWebsite('http://kennelflowpro.app'),null);
+});
 test('passwords use salted hashes and reject wrong passwords',async()=>{const hash=await hashPassword('a sufficiently long password');assert.notEqual(hash,await hashPassword('a sufficiently long password'));assert.equal(await verifyPassword('a sufficiently long password',hash),true);assert.equal(await verifyPassword('wrong password',hash),false)});
 test('employees cannot read financial or customer records',()=>{for(const type of ['expenses','payments','customers','clients','contracts','documents'])assert.equal(canRead('staff',type),false)});
 test('viewers cannot write any collection',()=>{for(const type of ['dogs','tasks','healthRecords','expenses'])assert.equal(canWrite('viewer',type),false)});
