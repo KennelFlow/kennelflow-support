@@ -150,7 +150,20 @@ function renderSpecialized(type,list){
       for(const row of matches.slice(0,10)){const match=el('div',undefined,'specialized-line');match.append(el('strong',recordName(row.record)),button('View / edit',()=>openEditor(row)));result.append(match)}
       if(!matches.length)result.append(el('p','No matching saved assignments.','muted'));
     });
-    panel.append(field,result);host.append(panel);
+    panel.append(field,result);
+    const writer=button('Program NFC tag',async()=>{
+      if(!('NDEFReader' in window)){message('This browser does not support Web NFC writing. Use supported Chrome on Android or the KennelFlow iPhone app.');return}
+      const value=input.value.trim();
+      const match=list.find(r=>!r.deleted_at&&(r.id===value||r.record?.externalQRPayload===value||r.record?.name===value));
+      if(!match){message('Enter the exact tag name, record ID or QR payload for an existing assignment before programming.');return}
+      const payload=match.record?.externalQRPayload||match.record?.id||match.id;
+      if(!confirm('Write this KennelFlow assignment onto the NFC tag you hold to this device? This will overwrite its current NDEF contents.'))return;
+      writer.disabled=true;
+      try{const ndef=new window.NDEFReader();await ndef.write({records:[{recordType:'text',data:payload}]});message('NFC write completed for '+recordName(match.record)+'. Scan the tag in the KennelFlow app to confirm its linked record.')}
+      catch(e){message('NFC writing was not completed: '+(e?.message||'Device or tag not available'))}
+      finally{writer.disabled=false}
+    });
+    panel.append(writer,el('p','NFC writing works only in browsers and devices that provide Web NFC and a writable compatible tag. Safari on iPhone does not offer Web NFC writing.','muted'));host.append(panel);
   }
 }
 
