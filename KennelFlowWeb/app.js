@@ -1,4 +1,8 @@
 import {createEmployees} from './employees.mjs';
+import {createWorkflows} from './workflow-ui.mjs';
+import {calendarCompletion,dayKey,dutyChecklist,dutyChange,stableID} from './workflows.mjs';
+import {attachScanner,tagPayload} from './scanner.mjs';
+import {catalog,breedColors,breedCoats} from './catalog.mjs';
 import {models,collections,canRead,canWrite,newRecord,normalizedRow,recordName,validateModel,isoDate,uuid} from './records.mjs';
 const $=id=>document.getElementById(id);
 const labels={dogs:'Dogs',puppies:'Puppies',litters:'Litters',breedingRecords:'Breeding records',healthRecords:'Health records',puppyMedicalRecords:'Puppy medical records',customers:'Puppy buyers',clients:'Clients',tasks:'Tasks',training:'Training',equipment:'Equipment',kennels:'Kennels / areas',documents:'Photos & documents',contracts:'Contracts',payments:'Payments',groomingRecords:'Grooming',feedingPlans:'Feeding plans',supplementRecords:'Supplements',semenRecords:'Semen records',scanFolders:'Report folders',scannedReports:'Scanned reports',boardingRecords:'Boarding',calendarEvents:'Calendar events',employeeActivity:'Employee activity',staffTimeEntries:'Staff time entries',kennelCareSessions:'Kennel care',expenses:'Expenses',dailyDutyShifts:'Duty categories',dailyDutyTemplates:'Duty templates',dailyDutyRecords:'Duty records',smartTags:'QR / NFC assignments',inventoryLocations:'Inventory locations',inventoryItems:'Inventory items',travelManifests:'Travel manifests',inventoryScans:'Inventory scans',inventoryReports:'Inventory reports',smartPlacements:'Tag placements'};
@@ -7,7 +11,9 @@ const referenceTypes={puppyID:['puppies'],litterID:['litters'],linkedLitterID:['
 let teamMembers=[];
 let rows=new Map(),identity=null,kennels=[],kennel='',role='',active='Overview',loading=false,loadSequence=0,editor=null,saving=false;
 let month=new Date(new Date().getFullYear(),new Date().getMonth(),1),selectedDay='';
+let stopScanner=null;
 const employees=createEmployees({host:$('employeesPanel'),api,state:()=>({rows,identity,kennel,role}),onMembers:value=>{teamMembers=value},onError:e=>{message(e.message);if(e.status===401)requireLogin()},refresh:()=>load(),edit:row=>openEditor(row),add:type=>openEditor(null,type)});
+const workflows=createWorkflows({state:()=>({rows,identity,kennel,role}),save:write,refresh:async cloud=>cloud?load(true):renderList(),edit:openEditor,add:(type,record)=>openEditor(null,type,record),choose:chooseCollection,onError:e=>{message(e.message);if(e.status===401)requireLogin()},onMessage:text=>message(text),complete:completeActivity,report:showReport,showPedigree});
 const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n};
 const button=(text,action,cls='secondary')=>{const n=el('button',text,cls);n.type='button';n.addEventListener('click',action);return n};
 const human=key=>key.replace(/([a-z])([A-Z])/g,'$1 $2').replace(/ID(s)?$/,' reference$1').replace(/^./,x=>x.toUpperCase());
@@ -62,7 +68,8 @@ async function load(silent=false){
   finally{if(sequence===loadSequence){loading=false;$('refresh').disabled=false}}
 }
 function visibleGroups(){return Object.entries(groups).filter(([name,types])=>name==='Overview'||name==='Employees'&&!!role||types.some(t=>canRead(role,t)))}
-function selectSection(name){active=name;selectedDay='';renderNav();renderPanel()}
+function selectSection(name){if(name!=='QR / NFC'){stopScanner?.();stopScanner=null}active=name;selectedDay='';renderNav();renderPanel()}
+function chooseCollection(type){const group=Object.entries(groups).find(([,types])=>types.includes(type));if(!group||!canRead(role,type))return;active=group[0];renderNav();renderPanel();$('collection').value=type;renderList()}
 function renderNav(){
   $('nav').replaceChildren();
   if(!visibleGroups().some(([name])=>name===active))active='Overview';
@@ -90,6 +97,7 @@ function renderList(){
   let list=[...rows.values()].filter(r=>r.type===type&&(deleted?!!r.deleted_at:!r.deleted_at)&&(!term||JSON.stringify(r.record).toLowerCase().includes(term)));
   renderCalendar(type,list);
   renderSpecialized(type,list);
+  if(type==='calendarEvents'&&!deleted){ $('list').replaceChildren();$('count').textContent=selectedDay?'Schedule for '+selectedDay:'Choose a date';return }
   if(type==='calendarEvents'&&selectedDay)list=list.filter(r=>localDay(r.record?.startDate)===selectedDay);
   list.sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at)));
   $('count').textContent=`${list.length} ${deleted?'deleted ':''}record${list.length===1?'':'s'}${selectedDay?' · '+selectedDay:''}`;
@@ -100,6 +108,7 @@ function renderList(){
     if(canWrite(role,type)&&row.record){actions.append(button(row.deleted_at?'Restore':'Edit',()=>row.deleted_at?restore(row):openEditor(row)));if(!row.deleted_at)actions.append(button('Delete',()=>remove(row),'danger'))}
     if(!row.deleted_at&&['documents','scannedReports'].includes(type)&&['owner','admin'].includes(role)){actions.append(button('Download',()=>download(row)));actions.append(button('Replace file',()=>replaceFile(row)));}
     if(!row.deleted_at&&type==='tasks'&&canWrite(role,type))actions.append(button(row.record.completed?'Reopen':'Complete',()=>toggleCompleted(row)));
+    if(!row.deleted_at){actions.append(button(type==='payments'?'Receipt':'Print record',()=>showReport(type==='payments'?'Payment receipt':recordName(row.record),[[labels[type],[row.record]]])));if(type==='dogs')workflows.dogActions(row,actions);if(type==='smartTags')actions.append(button('View / print QR',()=>showTagQR(row)));if(canWrite(role,'documents')&&!['documents','scannedReports'].includes(type))actions.append(button('Attach photo / document',()=>attachDocument(row)))}
     head.append(text,actions);card.append(head);
     const detail=el('details',undefined,'detail-block');detail.append(el('summary','View record details'));const dl=el('dl');
     for(const [key,value] of Object.entries(row.record||{})){if(key==='id'||value==null||value==='')continue;dl.append(el('dt',human(key)),el('dd',displayValue(value,key)))}detail.append(dl);card.append(detail);
@@ -111,6 +120,8 @@ function renderList(){
 
 function renderSpecialized(type,list){
   const host=$('specialized')||(()=>{const elHost=el('div');elHost.id='specialized';$('calendar').insertAdjacentElement('afterend',elHost);return elHost})();
+  if(type==='smartTags'&&host.dataset.activeType===type&&host.querySelector('[data-scanning="true"]'))return;
+  stopScanner?.();stopScanner=null;
   // Reuse the live payment form across cloud polling; rebuilding it cleared typed values every 15 seconds.
   if(type==='payments'&&host.dataset.activeType==='payments'&&host.querySelector('form')){
     const active=list.filter(r=>!r.deleted_at);
@@ -122,21 +133,12 @@ function renderSpecialized(type,list){
   }
   host.dataset.activeType=type;
   host.replaceChildren();
+  if($('deleted').checked)return;
   if(type==='dailyDutyRecords'){
-    const today=localDay(new Date()),todayRecords=list.filter(r=>r.record?.dateKey===today);
-    const panel=el('section',undefined,'specialized-panel');panel.append(el('h3',"Today's duty checklist"),el('p',"Today's saved duties only. Completing a duty writes to the shared cloud record; other days remain in history.",'muted'));
-    for(const row of todayRecords){
-      const line=el('div',undefined,'specialized-line'),label=el('span',(row.record.shift||'Duty')+' · '+row.record.taskTitle);
-      line.append(label,el('span',row.record.completed?'Completed':'Pending','muted'));
-      if(canWrite(role,type))line.append(button(row.record.completed?'Reopen':'Complete',async()=>{
-        try{const finished=!row.record.completed;await write(row,{...row.record,completed:finished,...(finished?{completedAt:isoDate(Date.now())}:{completedAt:undefined})});await load(true);renderList()}
-        catch(e){message(e.message)}
-      }));
-      panel.append(line);
-    }
-    if(!todayRecords.length)panel.append(el('p','No duties are saved for today. Use Add duty records or manage duty templates.','muted'));
-    host.append(panel);
+    workflows.duties(host);
   }
+  if(type==='kennelCareSessions')workflows.care(host);
+  workflows.summary(host,type);
   if(type==='payments'){
     const live=list.filter(r=>!r.deleted_at),realPayments=live.filter(r=>!String(r.record?.method||'').includes('Sandbox')),testPayments=live.filter(r=>String(r.record?.method||'').includes('Sandbox')),amount=(records,key)=>records.reduce((total,r)=>total+(Number(r.record?.[key])||0),0);
     const panel=el('section',undefined,'specialized-panel');
@@ -329,51 +331,54 @@ function renderSpecialized(type,list){
     host.append(panel);
   }
   if(type==='smartTags'){
-    const panel=el('section',undefined,'specialized-panel');panel.append(el('h3','QR / NFC assignment lookup'),el('p','Search by tag name, linked ID, or QR payload. This page does not write physical NFC tags. Use the iPhone app for NFC programming.','muted'));
+    const panel=el('section',undefined,'specialized-panel');panel.append(el('h3','QR / NFC assignments'),el('p','Scan a QR code, choose a code photo, or paste a saved tag. NFC needs a device and browser that support Web NFC.','muted'));
     const field=el('label','Tag or QR payload'),input=el('input');input.type='search';input.placeholder='Paste a scanned QR code or tag ID';field.append(input);
     const result=el('div');input.addEventListener('input',()=>{
       const value=input.value.trim().toLowerCase();result.replaceChildren();
       if(!value)return;
-      const matches=list.filter(r=>!r.deleted_at&&Object.values(r.record||{}).some(v=>typeof v==='string'&&v.toLowerCase().includes(value)));
-      for(const row of matches.slice(0,10)){const match=el('div',undefined,'specialized-line');match.append(el('strong',recordName(row.record)),button('View / edit',()=>openEditor(row)));result.append(match)}
+      const tagID=value.match(/^kennelflow:\/\/smart\/([a-f0-9-]{36})$/)?.[1];
+      const matches=[...rows.values()].filter(r=>r.type==='smartTags'&&!r.deleted_at&&(r.id.toLowerCase()===tagID||tagPayload(r.record).toLowerCase()===value||Object.values(r.record||{}).some(v=>typeof v==='string'&&v.toLowerCase().includes(value))));
+      for(const row of matches.slice(0,10)){const match=el('div',undefined,'specialized-line');match.append(el('strong',recordName(row.record)),button('View / print QR',()=>showTagQR(row)));if(canWrite(role,type))match.append(button('Edit assignment',()=>openEditor(row)));const linked=[row.record.dogID,row.record.areaID,row.record.linkedID].map(id=>id&&rows.get(id.toLowerCase())).find(r=>r&&!r.deleted_at);if(linked&&canRead(role,linked.type))match.append(button('Open linked record',()=>{chooseCollection(linked.type);if(canWrite(role,linked.type))openEditor(linked)}));result.append(match)}
       if(!matches.length)result.append(el('p','No matching saved assignments.','muted'));
     });
     panel.append(field,result);
+    const scanner=el('div');panel.append(scanner);stopScanner=attachScanner(scanner,value=>{input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}))});
     const writer=button('Program NFC tag',async()=>{
       if(!('NDEFReader' in window)){message('This browser does not support Web NFC writing. Use supported Chrome on Android or the KennelFlow iPhone app.');return}
       const value=input.value.trim();
-      const match=list.find(r=>!r.deleted_at&&(r.id===value||r.record?.externalQRPayload===value||r.record?.name===value));
+      const match=[...rows.values()].find(r=>r.type==='smartTags'&&!r.deleted_at&&(r.id===value.toLowerCase()||tagPayload(r.record).toLowerCase()===value.toLowerCase()||r.record?.name===value));
       if(!match){message('Enter the exact tag name, record ID or QR payload for an existing assignment before programming.');return}
-      const payload=match.record?.externalQRPayload||match.record?.id||match.id;
+      const payload=tagPayload(match.record);
       if(!confirm('Write this KennelFlow assignment onto the NFC tag you hold to this device? This will overwrite its current NDEF contents.'))return;
       writer.disabled=true;
       try{const ndef=new window.NDEFReader();await ndef.write({records:[{recordType:'text',data:payload}]});message('NFC write completed for '+recordName(match.record)+'. Scan the tag in the KennelFlow app to confirm its linked record.')}
       catch(e){message('NFC writing was not completed: '+(e?.message||'Device or tag not available'))}
       finally{writer.disabled=false}
     });
-    panel.append(writer,el('p','NFC writing works only in browsers and devices that provide Web NFC and a writable compatible tag. Safari on iPhone does not offer Web NFC writing.','muted'));host.append(panel);
+    if(canWrite(role,type))panel.append(writer);panel.append(el('p','On iPhone, use the native KennelFlow app to program NFC. QR scanning and QR labels are available here.','muted'));host.append(panel);
   }
 }
 
 function displayValue(value,key){if(typeof value==='boolean')return value?'Yes':'No';if(Array.isArray(value))return value.map(x=>typeof x==='object'?Object.entries(x).filter(([k])=>k!=='id').map(([k,v])=>human(k)+': '+displayValue(v,k)).join(' · '):String(x)).join('\n');if(typeof value==='object')return JSON.stringify(value);if(typeof value==='string'&&/^\d{4}-\d\d-\d\dT/.test(value))return new Date(value).toLocaleString();return String(value)}
 function renderCalendar(type,list){
-  const box=$('calendar');box.replaceChildren();if(type!=='calendarEvents')return;
+  const box=$('calendar');box.replaceChildren();if(type!=='calendarEvents'||$('deleted').checked)return;
   const bar=el('div',undefined,'calendar-bar');bar.append(button('Previous month',()=>{month=new Date(month.getFullYear(),month.getMonth()-1,1);selectedDay='';renderList()}),el('strong',month.toLocaleString([],{month:'long',year:'numeric'})),button('Next month',()=>{month=new Date(month.getFullYear(),month.getMonth()+1,1);selectedDay='';renderList()}));box.append(bar);
-  const grid=el('div',undefined,'calendar-grid');for(const day of ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'])grid.append(el('small',day));
-  for(let n=0;n<month.getDay();n++)grid.append(el('span'));
-  const days=new Date(month.getFullYear(),month.getMonth()+1,0).getDate();
-  for(let d=1;d<=days;d++){const key=localDay(new Date(month.getFullYear(),month.getMonth(),d)),count=list.filter(r=>localDay(r.record?.startDate)===key).length,b=button(String(d),()=>{selectedDay=selectedDay===key?'':key;renderList()},'');b.classList.toggle('selected',key===selectedDay);b.setAttribute('aria-label',key+(count?` · ${count} events`:''));if(count)b.append(el('small',`${count} event${count===1?'':'s'}`));grid.append(b)}box.append(grid);
+  workflows.calendar(box,month,selectedDay,key=>{selectedDay=key;renderList()});
   if(selectedDay)box.append(button('Show all dates',()=>{selectedDay='';renderList()}));
 }
 function closeEditor(force=false){if(!force&&editor?.dirty&&!confirm('Discard your unsaved changes?'))return false;$('editor').close();editor=null;$('upload').value='';return true}
-function openEditor(row,typeOverride){
+function openEditor(row,typeOverride,initialRecord){
   const type=row?.type||typeOverride||chosen();if(!canWrite(role,type))return;
-  const record=row?structuredClone(row.record):newRecord(collections[type]);
+  const record=row?structuredClone(row.record):initialRecord?structuredClone(initialRecord):newRecord(collections[type]);
   if(!record){message('This record has an unsupported format. Its cloud copy was preserved.');return}
   if(!row&&type==='calendarEvents'&&selectedDay)record.startDate=isoDate(selectedDay+'T09:00:00');
+  if(!row&&type==='dailyDutyRecords'){record.dateKey=dayKey();if(!record.shift)record.shift=[...rows.values()].find(r=>r.type==='dailyDutyShifts'&&!r.deleted_at)?.record.name||''}
   editor={id:(row?.id||record.id).toLowerCase(),type,revision:row?.revision||0,base:structuredClone(record),draft:record,dirty:!row,kennel,conflict:null};
   $('editorTitle').textContent=(row?'Edit ':'Add ')+(labels[type]||'record');$('editorSubtitle').textContent='CHANGES SYNC WITH YOUR APP';$('editError').textContent='';$('editStatus').textContent='';$('upload').value='';$('uploadLabel').hidden=!['documents','scannedReports'].includes(type)||!!row;$('conflict').hidden=true;$('save').disabled=false;
   $('fields').replaceChildren();renderObject(collections[type],editor.draft,$('fields'));
+  $('cameraButton').hidden=!['documents','scannedReports'].includes(type)||!!row;
+  $('deleteEditor').hidden=!row;
+  $('deleteEditor').onclick=async()=>{await remove(row);if(rows.get(row.id)?.deleted_at)closeEditor(true)};
   $('editor').showModal();
 }
 function dirty(){if(editor){editor.dirty=true;$('editStatus').textContent='Unsaved changes'}}
@@ -387,6 +392,8 @@ function renderObject(model,object,parent){
       control=el('select');const blank=el('option','Unassigned');blank.value='';control.append(blank);
       const names=[...new Set(teamMembers.map(m=>m.name||m.email))];if(value&&!names.includes(value))names.unshift(value);
       for(const name of names){const option=el('option',name);option.value=name;control.append(option)}control.value=value||'';
+    }else if(field.key==='shift'&&['dailyDutyTemplates','dailyDutyRecords'].includes(editor?.type)){
+      control=el('select');const names=[...new Set([...rows.values()].filter(r=>r.type==='dailyDutyShifts'&&!r.deleted_at).map(r=>r.record.name))];if(value&&!names.includes(value))names.unshift(value);for(const name of names){const o=el('option',name);o.value=name;control.append(o)}control.value=value||names[0]||'';object[field.key]=control.value;
     }else if(field.options||type==='Bool'&&field.optional||type==='UUID'){
       control=el('select');if(field.optional||type==='UUID'){const blank=el('option',field.optional?'None':'Choose a record');blank.value='';control.append(blank)}
       let options=field.options?.map(v=>[v,v])||[];
@@ -401,6 +408,12 @@ function renderObject(model,object,parent){
     else if(type==='String'&&/notes|instructions|text|description|detail|body|plan/i.test(field.key)){control=el('textarea');control.value=value||'';label.classList.add('wide')}
     else {control=el('input');control.type=type==='Date'?'datetime-local':['Double','Int','Int64'].includes(type)?'number':field.key.toLowerCase().includes('email')?'email':'text';if(type==='Date')control.step='1';if(control.type==='number')control.step=type==='Double'?'any':'1';control.value=value==null?'':type==='Date'?dateInput(value):String(value)}
     control.required=!field.optional&&type!=='Bool';control.dataset.field=field.key;
+    const pickerOptions=field.key==='breed'?catalog.recognizedBreeds:field.key==='color'?breedColors(object.breed):field.key==='coat'?breedCoats(object.breed):field.key.toLowerCase().includes('registrationorganization')||field.key==='registry'?catalog.registries:field.key==='sex'?['Male','Female','Unknown']:null;
+    if(pickerOptions&&control.tagName==='INPUT'){
+      const choices=el('datalist');choices.id='choices-'+editor.id+'-'+model+'-'+field.key;for(const option of pickerOptions){const value=el('option');value.value=option;choices.append(value)}control.setAttribute('list',choices.id);label.append(choices);
+      if(field.key==='breed')control.addEventListener('input',()=>{for(const [key,options] of [['color',breedColors(control.value)],['coat',breedCoats(control.value)]]){const list=parent.querySelector('[data-field="'+key+'"]')?.list;if(list){list.replaceChildren();for(const name of options){const option=el('option');option.value=name;list.append(option)}}}});
+    }
+    if(field.key==='dateKey')control.type='date';
     control.addEventListener('input',()=>{let next=type==='Bool'?(field.optional?control.value===''?undefined:control.value==='true':control.checked):control.value===''&&field.optional?undefined:type==='Date'?control.value?isoDate(control.value):'':['Double','Int','Int64'].includes(type)?Number(control.value):control.value;if(next===undefined)delete object[field.key];else object[field.key]=next;dirty()});
     label.append(control);parent.append(label);
   }
@@ -430,7 +443,7 @@ function showConflict(latest){
   if(!conflicts.length)box.append(el('p','Your changes affect different fields. They can be combined with the latest cloud version.'));
   box.append(button('Apply reviewed changes',()=>{if(choices.size<conflicts.length){$('editError').textContent='Choose which version to keep for each conflicting field.';return}for(const key of conflicts){const source=choices.get(key)==='mine'?mine:theirs;if(Object.hasOwn(source,key))merged[key]=structuredClone(source[key]);else delete merged[key]}editor.draft=merged;editor.base=structuredClone(theirs);editor.revision=latest.revision;editor.conflict=null;$('fields').replaceChildren();renderObject(collections[editor.type],editor.draft,$('fields'));box.hidden=true;$('save').disabled=false;$('editError').textContent='';dirty()}));
 }
-async function write(row,record,deletedAt){return api(`kennels/${kennel}/records/${row.id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:row.type,expectedRevision:row.revision,record,...(deletedAt?{deletedAt}:{})})})}
+async function write(row,record,deletedAt){if(row.kennel&&row.kennel!==kennel)throw Error('The selected kennel changed. Open this record again.');return api(`kennels/${kennel}/records/${row.id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:row.type,expectedRevision:row.revision,record,...(deletedAt?{deletedAt}:{})})})}
 async function save(event){
   event.preventDefault();if(!editor||saving||editor.conflict)return;
   const current=editor;if(current.kennel!==kennel)return;
@@ -438,12 +451,21 @@ async function save(event){
   if(['documents','scannedReports'].includes(current.type)&&current.revision===0){if(!upload){$('editError').textContent='Choose a photo or document first.';return}const ext=(upload.name.split('.').pop()||'bin').replace(/[^a-z0-9]/gi,'').slice(0,12)||'bin';current.draft.fileName=current.id+'.'+ext}
   if(upload&&upload.size>10485760){$('editError').textContent='Choose a file smaller than 10 MB.';return}
   const error=validateModel(collections[current.type],current.draft);if(error){$('editError').textContent=human(error);return}
+  if(current.type==='dailyDutyShifts'&&[...rows.values()].some(r=>r.type===current.type&&!r.deleted_at&&r.id!==current.id&&r.record.name.trim().toLowerCase()===current.draft.name.trim().toLowerCase())){$('editError').textContent='A duty category already has that name.';return}
   saving=true;$('save').disabled=true;$('closeEditor').disabled=true;$('cancelEditor').disabled=true;$('editStatus').textContent='Saving…';
   try{
+    if(current.type==='dailyDutyShifts'&&current.revision>0&&current.base.name!==current.draft.name){
+      for(const dependent of [...rows.values()].filter(r=>!r.deleted_at&&['dailyDutyTemplates','dailyDutyRecords'].includes(r.type)&&r.record.shift===current.base.name)){
+        const response=await write(dependent,{...dependent.record,shift:current.draft.name});rows.set(dependent.id,normalizedRow(response.record));
+      }
+    }
     const data=await write(current,current.draft),row=normalizedRow(data.record);
     if(!uuid(row.id)||row.id.toLowerCase()!==current.id.toLowerCase()||row.revision<=current.revision)throw Error('Cloud acknowledgement was invalid. Refresh before retrying.');
     current.revision=row.revision;current.base=structuredClone(current.draft);rows.set(row.id,row);
     if(upload){const response=await fetch(`/api/kennels/${kennel}/files/${current.id}`,{method:'PUT',credentials:'same-origin',body:upload});if(!response.ok){const value=await response.json();throw Object.assign(Error('Record saved, but the file upload needs retrying: '+(value.error||'connection interrupted')),{status:response.status})}}
+    if(current.replaces){await write(current.replaces,current.replaces.record,isoDate(Date.now()));current.replaces=null}
+    if(current.type==='kennelCareSessions')await mirrorCareDuties(current.draft);
+    if(current.type==='calendarEvents'&&row.record.completedAt)await completeActivity(row);
     current.dirty=false;closeEditor(true);message('Saved to cloud. Connected apps will receive this change on their next sync.');await load(true);
   }catch(e){$('editError').textContent=e.message;$('editStatus').textContent='Your form is preserved.';if(e.status===401)requireLogin();if(e.status===409){await load(true);const latest=rows.get(current.id);if(latest)showConflict(latest)}}
   finally{saving=false;$('save').disabled=!!editor?.conflict;$('closeEditor').disabled=false;$('cancelEditor').disabled=false}
@@ -451,32 +473,57 @@ async function save(event){
 async function remove(row){if(!confirm(`Delete ${recordName(row.record)}? It will also be removed from connected apps. You can restore it from Show deleted.`))return;try{await write(row,row.record,isoDate(Date.now()));await load()}catch(e){message(e.status===409?'Another device changed this record. Refresh and review it before deleting.':e.message)}}
 async function restore(row){try{await write(row,row.record);await load()}catch(e){message(e.message)}}
 async function toggleCompleted(row){try{await write(row,{...row.record,completed:!row.record.completed});await load(true)}catch(e){message(e.message)}}
+async function completeActivity(row){
+ if(row.type==='tasks')return toggleCompleted(row);
+ const scope=kennel,{current,next}=await calendarCompletion(row);if(scope!==kennel)throw Error('The selected kennel changed. Open the activity again.');
+ if(!equal(row.record,current)){const response=await write(row,current);rows.set(row.id,normalizedRow(response.record))}
+ if(next&&!rows.has(next.id)){
+  try{await write({id:next.id,type:'calendarEvents',revision:0},next)}
+  catch(e){if(e.status!==409)throw Error('Activity completed, but the next occurrence needs retrying: '+e.message);await load(true);const existing=rows.get(next.id);if(!existing||existing.type!=='calendarEvents'||existing.record.startDate!==next.startDate)throw Error('Recurring occurrence conflicts with another record. Review Calendar history.')}
+ }
+ if(scope===kennel)await load(true);
+}
+async function mirrorCareDuties(session){
+ const system=session.shift||(['Morning','Afternoon','Night'][new Date(session.timestamp).getHours()<12?0:new Date(session.timestamp).getHours()<18?1:2]);
+ const shift=[...rows.values()].find(r=>r.type==='dailyDutyShifts'&&!r.deleted_at&&r.record.systemName===system)?.record.name||system;
+ const key=dayKey(session.timestamp),items=[['kennelCleaned','Kennel cleaned'],['waterChanged','Water changed / refreshed'],['fed','Fed'],['medicationGiven','Medication given'],['exerciseCompleted','Exercise / walk completed'],['bathroomBreak','Bathroom break completed']];
+ for(const [flag,title] of items){
+  if(!session[flag])continue;
+  let template=[...rows.values()].find(r=>r.type==='dailyDutyTemplates'&&!r.deleted_at&&r.record.shift===shift&&r.record.title.trim().toLowerCase()===title.toLowerCase());
+  if(!template&&canWrite(role,'dailyDutyTemplates')){const id=await stableID('kennel-care-duty|'+shift+'|'+title);try{const response=await write({id,type:'dailyDutyTemplates',revision:0},{id,title,shift});template=normalizedRow(response.record);rows.set(id,template)}catch(e){if(e.status!==409)throw e;await load(true);template=rows.get(id)}}
+  if(!template)continue;
+  const unit=dutyChecklist([...rows.values()],key).find(u=>u.template?.id===template.id);
+  if(unit&&!unit.completed){const change=await dutyChange(unit,key,session.timestamp);try{const response=await write(change.row,change.record);rows.set(change.row.id,normalizedRow(response.record))}catch(e){if(e.status!==409)throw e;await load(true)}}
+ }
+}
+function showReport(title,sections){
+ const area=$('reportContent');area.replaceChildren(el('p','KENNELFLOW','eyebrow'),el('h2',title),el('p',kennels.find(k=>k.id===kennel)?.name||''),el('p','Generated '+new Date().toLocaleString(),'muted'));
+ for(const [name,records] of sections){area.append(el('h3',human(name)));if(!records.length)area.append(el('p','No records.','muted'));for(const record of records){const block=el('dl');for(const [key,value] of Object.entries(record)){if(key==='id'||value==null||value==='')continue;block.append(el('dt',human(key)),el('dd',displayValue(value,key)))}area.append(block)}}
+ $('reportDialog').showModal();
+}
+function showPedigree(title,levels){showReport(title,[]);const chart=el('div',undefined,'pedigree-chart');for(const [i,nodes] of levels.entries()){const column=el('section',undefined,'pedigree-generation');column.append(el('h3',i===0?'Dog':'Generation '+i));const members=el('div',undefined,'pedigree-members');for(const node of nodes){const box=el('div',undefined,'pedigree-dog');box.append(el('strong',node.name));if(node.record?.registrationNumber)box.append(el('small',node.record.registrationNumber));if(node.record?.registeredName&&node.record.registeredName!==node.name)box.append(el('small',node.record.registeredName));members.append(box)}column.append(members);chart.append(column)}$('reportContent').append(chart,el('p','KennelFlow · Entries come from saved dog records. Unrecorded ancestors are shown explicitly.','muted'))}
+async function showTagQR(row){try{const {qrImage}=await import('./scan-codecs.mjs');const payload=tagPayload(row.record),src=await qrImage(payload);showReport(recordName(row.record)+' · QR label',[['Assignment',[{name:row.record.name,payload,placement:row.record.placementName||row.record.locationName||''}]]]);const image=el('img');image.src=src;image.alt='QR code for '+recordName(row.record);image.width=300;image.height=300;$('reportContent').append(image);const link=el('a','Download QR image');link.href=src;link.download='KennelFlow-QR-'+row.id+'.png';$('reportContent').append(link)}catch(e){message('QR could not be generated: '+e.message)}}
+function attachDocument(row){const record=newRecord('DocumentRecord'),types={dogs:'DogProfile',puppies:'PuppyProfile',expenses:'ExpenseReceipt',healthRecords:'HealthRecord',contracts:'ContractFile'};record.linkedType=types[row.type]||collections[row.type];record.linkedName=row.id.toUpperCase();record.title=recordName(row.record)+' · Attachment';record.kind=row.type==='expenses'?'Receipt':row.type==='healthRecords'?'Health Record':row.type==='contracts'?'Contract':'Photo';openEditor(null,'documents',record)}
 async function replaceFile(row){
   if(!['owner','admin'].includes(role)||!['documents','scannedReports'].includes(row.type))return;
-  const picker=el('input');picker.type='file';picker.accept='image/*,.pdf,.txt,.doc,.docx';
-  picker.addEventListener('change',async()=>{
-    const file=picker.files?.[0];if(!file)return;
-    if(file.size>10485760){message('File must be 10 MB or smaller.');return}
-    if(!confirm('Replace the cloud file for '+recordName(row.record)+'? The previous file will no longer be available.'))return;
-    const scope=kennel;
-    try{
-      const current=rows.get(row.id);
-      if(!current||current.revision!==row.revision){message('This record changed. Refresh and try again.');return}
-      const response=await fetch('/api/kennels/'+scope+'/files/'+row.id,{method:'PUT',credentials:'same-origin',body:file,headers:{'X-Requested-With':'KennelFlowWeb'}});
-      const detail=await response.json().catch(()=>({}));
-      if(!response.ok)throw Object.assign(Error(detail.error||'Upload failed'),{status:response.status});
-      message('Document file updated in cloud. The record metadata remains unchanged.');
-    }catch(e){message(e.message);if(e.status===401)requireLogin()}
-  });
-  picker.click();
+  if(!confirm('Save a replacement version of '+recordName(row.record)+'? The previous version will remain recoverable in Show deleted.'))return;
+  const record={...structuredClone(row.record),id:crypto.randomUUID()};delete record.fileName;
+  openEditor(null,row.type,record);editor.replaces=row;
+  $('editStatus').textContent='Choose a new file. The previous version is kept until this version finishes uploading.';
 }
+
 async function download(row){try{const r=await fetch(`/api/kennels/${kennel}/files/${row.id}`,{credentials:'same-origin'});if(!r.ok){const data=await r.json();throw Error(data.error||'File is not uploaded yet')}const url=URL.createObjectURL(await r.blob()),a=el('a');a.href=url;a.download=row.record.fileName||row.id;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000)}catch(e){message(e.message)}}
 $('loginForm').addEventListener('submit',async e=>{e.preventDefault();$('loginButton').disabled=true;try{message();await api('login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value,password:$('password').value})});$('password').value='';await init()}catch(e){message(e.message)}finally{$('loginButton').disabled=false}});
 function requireLogin(){if(!$('reauth').open){$('reauthEmail').value=identity?.email||'';$('reauthError').textContent='';$('reauth').showModal()}}
 $('reauthForm').addEventListener('submit',async e=>{e.preventDefault();$('reauthSubmit').disabled=true;try{await api('login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('reauthEmail').value,password:$('reauthPassword').value})});$('reauthPassword').value='';$('reauth').close();await init();if(editor)$('editStatus').textContent='Signed in. Your unsaved changes are preserved.'}catch(e){$('reauthError').textContent=e.message}finally{$('reauthSubmit').disabled=false}});
 $('reauthCancel').addEventListener('click',()=>$('reauth').close());
-$('logout').addEventListener('click',async()=>{if(!closeEditor())return;try{await api('logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})}finally{loadSequence++;employees.reset();teamMembers=[];rows.clear();identity=null;kennel='';role='';$('workspace').hidden=true;$('login').hidden=false;$('overview').replaceChildren();$('list').replaceChildren();message();setConnection('Signed out')}});
-$('kennel').addEventListener('change',async()=>{if(!closeEditor()){$('kennel').value=kennel;return}employees.reset();teamMembers=[];kennel=$('kennel').value;rows.clear();role='';render();await load()});
+$('cameraButton').onclick=()=>$('cameraUpload').click();
+$('cameraUpload').onchange=()=>{const file=$('cameraUpload').files?.[0];if(!file)return;try{const transfer=new DataTransfer();transfer.items.add(file);$('upload').files=transfer.files;dirty();$('editStatus').textContent='Photo captured. Save to attach it to this record.'}catch{message('Use Choose photo or document to select the captured photo.')}};
+$('printReport').onclick=()=>{document.body.classList.add('print-report');window.print()};
+$('closeReport').onclick=()=>{$('reportDialog').close();document.body.classList.remove('print-report')};
+window.addEventListener('afterprint',()=>document.body.classList.remove('print-report'));
+$('logout').addEventListener('click',async()=>{if(!closeEditor())return;try{await api('logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})}finally{loadSequence++;employees.reset();workflows.reset();stopScanner?.();stopScanner=null;$('reportDialog').close();$('reportContent').replaceChildren();document.body.classList.remove('print-report');teamMembers=[];rows.clear();identity=null;kennel='';role='';$('workspace').hidden=true;$('login').hidden=false;$('overview').replaceChildren();$('list').replaceChildren();message();setConnection('Signed out')}});
+$('kennel').addEventListener('change',async()=>{if(!closeEditor()){$('kennel').value=kennel;return}employees.reset();workflows.reset();stopScanner?.();stopScanner=null;$('reportDialog').close();$('reportContent').replaceChildren();teamMembers=[];kennel=$('kennel').value;rows.clear();role='';render();await load()});
 $('refresh').addEventListener('click',()=>load());$('add').addEventListener('click',()=>openEditor());$('collection').addEventListener('change',()=>{selectedDay='';renderList()});$('search').addEventListener('input',renderList);$('deleted').addEventListener('change',renderList);$('recordForm').addEventListener('submit',save);$('closeEditor').addEventListener('click',()=>closeEditor());$('cancelEditor').addEventListener('click',()=>closeEditor());$('editor').addEventListener('cancel',e=>{e.preventDefault();if(!saving)closeEditor()});$('upload').addEventListener('change',dirty);$('print').addEventListener('click',()=>{document.querySelectorAll('#list details').forEach(d=>d.open=true);window.print()});
 
 // Export the currently filtered record list without including deleted records unless requested.

@@ -35,7 +35,7 @@ export function createWebServer({backend=BACKEND,fetcher=fetch,secure=process.en
     if(!k||!['owner','admin','staff','viewer'].includes(k.role))throw fail(403,'No access to this kennel');
     return k;
   }
-  const files={'/':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','text/javascript'],'/employees.mjs':['employees.mjs','text/javascript'],'/records.mjs':['records.mjs','text/javascript'],'/schema.mjs':['schema.mjs','text/javascript'],'/styles.css':['styles.css','text/css']};
+  const files={'/catalog.mjs':['catalog.mjs','text/javascript'],'/scanner.mjs':['scanner.mjs','text/javascript'],'/scan-codecs.mjs':['scan-codecs.mjs','text/javascript'],'/workflows.mjs':['workflows.mjs','text/javascript'],'/workflow-ui.mjs':['workflow-ui.mjs','text/javascript'],'/':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','text/javascript'],'/employees.mjs':['employees.mjs','text/javascript'],'/records.mjs':['records.mjs','text/javascript'],'/schema.mjs':['schema.mjs','text/javascript'],'/styles.css':['styles.css','text/css']};
   return http.createServer(async(req,res)=>{try{
     const url=new URL(req.url,'http://localhost'),path=url.pathname;
     res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');
