@@ -155,8 +155,8 @@ function renderSpecialized(type,list){
           feedback.replaceChildren(el('strong','SANDBOX ONLY — no real money. '));
           const link=el('a','Open test checkout');link.href=data.url;link.target='_blank';link.rel='noopener noreferrer';feedback.append(link);
           const check=button('Verify Square test payment',async()=>{
-            try{const v=await api('kennels/'+kennel+'/square-sandbox-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderID:data.orderID,amountCents})});
-              message(v.paid?'Square confirmed sandbox payment COMPLETED (ID '+v.paymentID+').':'Square has not confirmed a completed payment. Status: '+v.status);
+            try{const v=await api('kennels/'+kennel+'/square-sandbox-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderID:data.orderID,amountCents,customerName:customer.value})});
+              message(v.paid?'Square confirmed sandbox payment COMPLETED (ID '+v.paymentID+'). '+(v.saved?'TEST record saved to KennelFlow.':v.alreadyRecorded?'TEST record already exists.':'Payment verified.'):'Square has not confirmed a completed payment. Status: '+v.status);if(v.saved)await load(true);
             }catch(e){message(e.message)}
           });feedback.append(check);
         }catch(e){feedback.textContent=e.message}finally{sandboxButton.disabled=false}
