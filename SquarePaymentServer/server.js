@@ -154,6 +154,20 @@ app.post('/kennelflow/checkout', async (req,res)=>{
     return res.json({url,orderID:data.payment_link.order_id||'',status:'AWAITING_CUSTOMER_PAYMENT',cloudSaved:cloudReady()});
   }catch(e){return res.status(502).json({error:'Unable to create checkout'})}
 });
+app.post('/kennelflow/pending-list',async(req,res)=>{
+ try{
+  const secret=process.env.KENNELFLOW_CHECKOUT_SECRET,stamp=req.header('X-KF-Timestamp')||'',sig=req.header('X-KF-Signature')||'';
+  if(!secret||secret.length<32)return res.status(503).json({error:'Signed access unavailable'});
+  if(!/^[0-9]{13}$/.test(stamp)||Math.abs(Date.now()-Number(stamp))>120000||!/^[a-f0-9]{64}$/.test(sig))return res.status(403).json({error:'Unauthorized'});
+  const expected=crypto.createHmac('sha256',secret).update(stamp+'.'+(req.rawBody||JSON.stringify(req.body))).digest('hex');
+  if(!crypto.timingSafeEqual(Buffer.from(sig,'hex'),Buffer.from(expected,'hex')))return res.status(403).json({error:'Unauthorized'});
+  const kennelID=req.body?.kennelID;
+  if(!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(kennelID||''))return res.status(400).json({error:'Invalid kennel'});
+  if(!cloudReady())return res.status(503).json({error:'Cloud checkout database unavailable'});
+  const entries=await getCheckouts(kennelID,isProduction?'production':'sandbox');
+  return res.json({checkouts:entries});
+ }catch(e){console.warn('Pending checkout list failed',{name:e?.name||'unknown'});return res.status(502).json({error:'Unable to read cloud pending checkouts'})}
+});
 app.post('/kennelflow/checkout-status',async(req,res)=>{
   try{
     const secret=process.env.KENNELFLOW_CHECKOUT_SECRET;
