@@ -41,3 +41,15 @@ test('new professional records are available only to Business owners and admins'
   const limited=fixture('staff');assert.equal((await limited.call(`/v2/kennels/${kennel}/records/${id}`,'PUT',input)).status,403,type);
  }
 });
+
+test('only owner can change business profile and email change requires current password',async()=>{
+ const f=fixture('owner');
+ f.repo.updateProfile=async(_actor,_kennel,profile)=>{f.state.changes.push(profile)};
+ const payload={kennelID:kennel,expectedEmail:'staff@example.com',expectedBusinessName:'One',email:'staff@example.com',ownerName:'Owner',businessName:'My Business',phone:'304-555-0100',address:'Farm Lane',website:'https://example.org'};
+ let r=await f.call('/v2/business-profile','PATCH',payload);
+ assert.equal(r.status,200);assert.equal(f.state.changes.length,1);
+ assert.equal((await fixture('staff').call('/v2/business-profile','PATCH',payload)).status,403);
+ assert.equal((await f.call('/v2/business-profile','PATCH',{...payload,email:'changed@example.com'})).status,400);
+ assert.equal((await f.call('/v2/business-profile','PATCH',{...payload,ownerName:''})).status,400);
+ assert.equal((await f.call('/v2/business-profile','PATCH',{...payload,website:'javascript:alert(1)'})).status,400);
+});

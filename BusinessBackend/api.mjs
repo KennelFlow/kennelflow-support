@@ -59,6 +59,37 @@ export function createAPI(repo) { return { async fetch(request) {
   if(!account||!await verifyPassword(input.currentPassword,account.password_hash))return response(401,{error:'Password could not be verified'});
   await repo.changePassword(actor,await hashPassword(input.newPassword));return response(200,{ok:true});
  }
+ if(request.method==='PATCH'&&path==='/v2/business-profile') {
+  const input=await body(request),kennel=String(input.kennelID||'').toLowerCase();
+  const profile={
+   expectedEmail:String(input.expectedEmail||'').trim().toLowerCase(),
+   expectedBusinessName:String(input.expectedBusinessName||''),
+   email:String(input.email||'').trim().toLowerCase(),
+   ownerName:String(input.ownerName||'').trim(),
+   businessName:String(input.businessName||'').trim(),
+   phone:String(input.phone||'').trim(),
+   address:String(input.address||'').trim(),
+   website:String(input.website||'').trim()
+  };
+  if(!validUUID(kennel)||!validEmail(profile.email)||!validEmail(profile.expectedEmail)||
+     !profile.ownerName||profile.ownerName.length>120||!profile.businessName||profile.businessName.length>120||
+     profile.expectedBusinessName.length>120||profile.phone.length>40||profile.address.length>500||
+     profile.website.length>250||(/[^0-9()+. x-]/.test(profile.phone))||
+     (profile.website&&!/^https:\/\/[^\s/]+(?:\/[^\s]*)?$/i.test(profile.website)))
+     return response(400,{error:'Check business name, owner name, email and contact details'});
+  if((await repo.kennels(actor)).find(k=>k.id===kennel)?.role!=='owner')return response(403,{error:'Only the business owner can edit this account'});
+  if(profile.email!==actor.email) {
+   if(typeof input.currentPassword!=='string'||input.currentPassword.length>256||!input.currentPassword.length)
+    return response(400,{error:'Current password required to change login email'});
+   if(!await repo.allowLogin(digest(actor.email)))return response(429,{error:'Try again later'});
+   const account=await repo.account(actor.email);
+   if(!account||!await verifyPassword(input.currentPassword,account.password_hash))
+    return response(401,{error:'Current password incorrect'});
+  }
+  await repo.updateProfile(actor,kennel,profile);
+  const updated=await repo.session(actor.tokenHash);updated.tokenHash=actor.tokenHash;
+  return response(200,{ok:true,user:{id:updated.id,email:updated.email,name:updated.name},kennels:await repo.kennels(updated)});
+ }
  if(request.method==='POST'&&path==='/v2/logout'){await repo.logout(actor);return response(200,{ok:true})}
  if(request.method==='GET'&&path==='/v2/me')return response(200,{user:{id:actor.id,email:actor.email,name:actor.name},kennels:await repo.kennels(actor)});
  const match=/^\/v2\/kennels\/([a-f0-9-]{36})\/(members|invitations|records|files|history|clock)(?:\/([a-f0-9-]{36}))?$/.exec(path);
