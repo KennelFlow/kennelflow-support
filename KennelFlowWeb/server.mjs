@@ -1,6 +1,6 @@
 import http from 'node:http';
 import {readFile} from 'node:fs/promises';
-import {randomBytes, createHash} from 'node:crypto';
+import {randomBytes, createHash, createHmac} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {canWrite, collections, uuid, validateModel} from './records.mjs';
 const BACKEND='https://br-long-night-b5uhw0hi-kennelflowapi.compute.c-7.us-east-2.aws.neon.tech';
@@ -98,6 +98,33 @@ export function createWebServer({backend=BACKEND,fetcher=fetch,secure=process.en
         return forward(res,await upstream(upstreamPath,s.token,'POST',{action}));
       }
       throw fail(404,'Not found');
+    }
+    const checkout=/^\/api\/kennels\/([^/]+)\/square-checkout$/.exec(path);
+    if(checkout&&req.method==='POST'){
+      const scope=checkout[1].toLowerCase();
+      if(!uuid(scope))throw fail(400,'Invalid kennel');
+      const member=await membership(s.token,scope);
+      if(!['owner','admin'].includes(member.role))throw fail(403,'Only an owner or admin may create payment requests');
+      const input=await json(req,16384);
+      const {amountCents,customerName,description,reference}=input;
+      if(!Number.isSafeInteger(amountCents)||amountCents<100||amountCents>5000000||
+         typeof customerName!=='string'||!customerName.trim()||customerName.length>120||
+         typeof description!=='string'||description.length>250||
+         typeof reference!=='string'||reference.length>120)throw fail(400,'Enter valid payment details');
+      const secret=process.env.KENNELFLOW_CHECKOUT_SECRET;
+      if(!secret||secret.length<32)throw fail(503,'Secure checkout is not configured');
+      const body=JSON.stringify({kennelID:scope,amountCents,customerName:customerName.trim(),description,reference,requestID:randomBytes(16).toString('hex')});
+      const stamp=String(Date.now());
+      const signature=createHmac('sha256',secret).update(stamp+'.'+body).digest('hex');
+      const result=await fetcher('https://kennelflow-payments.onrender.com/kennelflow/checkout',{
+        method:'POST',headers:{'Content-Type':'application/json','X-KF-Timestamp':stamp,'X-KF-Signature':signature},
+        body,redirect:'manual',signal:AbortSignal.timeout(20000)
+      });
+      if(result.status>=300&&result.status<400)throw fail(502,'Checkout redirect blocked');
+      const data=await result.json().catch(()=>({error:'Invalid Square response'}));
+      if(!result.ok)return send(res,result.status>=500?502:result.status,{error:data.error||'Could not create checkout'});
+      if(!/^https:\/\//.test(data.url||''))throw fail(502,'Invalid checkout URL');
+      return send(res,200,{url:data.url,orderID:data.orderID||'',status:'AWAITING_CUSTOMER_PAYMENT'});
     }
     if(path==='/api/records'&&req.method==='GET'){
       const kennel=(url.searchParams.get('kennel')||'').toLowerCase(),cursor=url.searchParams.get('cursor');
