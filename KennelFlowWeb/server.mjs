@@ -127,7 +127,7 @@ export function createWebServer({backend=BACKEND,fetcher=fetch,secure=process.en
       if(!/^https:\/\//.test(data.url||''))throw fail(502,'Invalid checkout URL');
       return send(res,200,{url:data.url,orderID:data.orderID||'',status:'AWAITING_CUSTOMER_PAYMENT'});
     }
-    const pendingList=/^\\/api\\/kennels\\/([^/]+)\\/square-pending$/.exec(path);
+    const pendingList=new RegExp('^/api/kennels/([^/]+)/square-pending$').exec(path);
     if(pendingList&&req.method==='GET'){
       const scope=pendingList[1].toLowerCase();
       if(!uuid(scope))throw fail(400,'Invalid kennel');
