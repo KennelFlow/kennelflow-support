@@ -160,6 +160,9 @@ export function createWebServer({backend=BACKEND,fetcher=fetch,secure=process.en
       const data=await result.json().catch(()=>({error:'Invalid response'}));
       if(!result.ok)return send(res,result.status,{error:data.error||'Payment verification failed'});
       const verifiedOrderID=data.orderID||orderID;
+      if(data.paid===true&&data.cloudSettlement&&(data.cloudSettlement.saved||data.cloudSettlement.alreadyRecorded)){
+        return send(res,200,{paid:true,status:'COMPLETED',orderID:verifiedOrderID,paymentID:data.paymentID,environment:paymentStatus[2]?'sandbox':'production',saved:!!data.cloudSettlement.saved,alreadyRecorded:!!data.cloudSettlement.alreadyRecorded});
+      }
       if(data.paid===true&&typeof data.paymentID==='string'&&data.paymentID&&inputRecord){
         // Never record a sandbox transaction as real revenue. Test records carry an explicit method.
         const recordID=createHash('sha256').update('kf-square-'+(paymentStatus[2]?'sandbox':'production')+'-'+data.paymentID).digest('hex');
