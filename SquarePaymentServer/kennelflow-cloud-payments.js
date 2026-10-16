@@ -2,6 +2,13 @@ import pg from 'pg';
 import crypto from 'node:crypto';
 const db=new pg.Pool({connectionString:process.env.KENNELFLOW_SQUARE_DATABASE_URL,ssl:{rejectUnauthorized:false},max:4});
 export const cloudReady=()=>!!process.env.KENNELFLOW_SQUARE_DATABASE_URL;
+export async function cloudDiagnostic(){
+ if(!cloudReady())return {configured:false,connected:false,tableReady:false};
+ try{
+   const q=await db.query("SELECT to_regclass('public.kennelflow_square_checkouts') IS NOT NULL AS ready");
+   return {configured:true,connected:true,tableReady:q.rows[0]?.ready===true};
+ }catch(error){return {configured:true,connected:false,tableReady:false,errorCode:error?.code||'UNKNOWN'}}
+}
 export async function putCheckout(x){
  if(!cloudReady())throw Error('Cloud payment storage is not configured');
  await db.query('INSERT INTO public.kennelflow_square_checkouts(order_id,kennel_id,environment,customer_name,amount_cents,reference,checkout_url) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(order_id) DO NOTHING',[x.orderID,x.kennelID,x.environment,x.customerName,x.amountCents,x.reference,x.url]);
