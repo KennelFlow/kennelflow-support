@@ -138,6 +138,17 @@ function renderSpecialized(type,list){
     const needs=list.filter(r=>!r.deleted_at&&(type==='kennels'?r.record?.needsMaintenance:r.record?.needsReplacement||['Broken','Needs Repair','Poor'].includes(r.record?.condition)));
     panel.append(el('h3','Maintenance attention'),el('p',needs.length+' '+(type==='kennels'?'kennel areas':'equipment items')+' flagged for attention. These flags sync as existing native app records. Detailed maintenance logs need a matching cloud model.','muted'));
     for(const row of needs){const line=el('div',undefined,'specialized-line');line.append(el('strong',recordName(row.record)),button('Review',()=>openEditor(row)));panel.append(line)}
+    const historyArea=el('div');panel.append(button('Load kennel/equipment change history',async()=>{
+      historyArea.replaceChildren(el('p','Loading saved change history…','muted'));
+      try{
+        const response=await api('kennels/'+kennel+'/history');
+        const changes=(response.events||[]).filter(e=>['kennels','equipment'].includes(e.record_type)||['KennelRun','EquipmentItem'].includes(e.record_type));
+        historyArea.replaceChildren();
+        for(const event of changes){const item=el('div',undefined,'specialized-line');item.append(el('span',(event.title||'Kennel item')+' · '+(event.action||'Changed')+' · '+(event.actor_name||'Team member')+' · '+new Date(event.created_at).toLocaleString()));historyArea.append(item)}
+        if(response.nextCursor)historyArea.append(el('p','Showing the most recent change-history page. Older history is available in Employees → Work history.','muted'));
+        if(!changes.length)historyArea.append(el('p','No recent kennel or equipment edits in the current history page.','muted'));
+      }catch(e){historyArea.replaceChildren(el('p',e.message,'muted'))}
+    }));panel.append(historyArea);
     host.append(panel);
   }
   if(type==='smartTags'){
