@@ -154,8 +154,9 @@ export function createWebServer({backend=BACKEND,fetcher=fetch,secure=process.en
         const error=validateModel(collections.payments,record);
         if(error)throw fail(400,error);
         const saved=await upstream('/v2/kennels/'+scope+'/records/'+identifier,s.token,'PUT',{type:'payments',expectedRevision:0,data:{platform:'ios',collection:'payments',record}});
-        if(saved.status!==200&&saved.status!==201&&saved.status!==409)return send(res,502,{error:'Square confirmed payment, but KennelFlow could not save the record'});
-        return send(res,200,{paid:true,status:'COMPLETED',orderID,paymentID:data.paymentID,environment:paymentStatus[2]?'sandbox':'production',saved:saved.status!==409,alreadyRecorded:saved.status===409});
+        if(saved.status===409)return send(res,409,{paid:true,status:'COMPLETED',orderID,paymentID:data.paymentID,environment:paymentStatus[2]?'sandbox':'production',saved:false,error:'Square confirmed payment, but KennelFlow could not verify whether the cloud record already exists. No duplicate record was created.'});
+        if(saved.status!==200&&saved.status!==201)return send(res,502,{paid:true,error:'Square confirmed payment, but KennelFlow could not save the record'});
+        return send(res,200,{paid:true,status:'COMPLETED',orderID,paymentID:data.paymentID,environment:paymentStatus[2]?'sandbox':'production',saved:true,alreadyRecorded:false});
       }
       return send(res,200,{paid:data.paid===true,status:data.status,orderID:data.orderID,paymentID:data.paymentID||'',environment:paymentStatus[2]?'sandbox':'production'});
     }
