@@ -99,7 +99,7 @@ export function createWebServer({backend=BACKEND,fetcher=fetch,secure=process.en
       }
       throw fail(404,'Not found');
     }
-    const checkout=/^\/api\/kennels\/([^/]+)\/square-checkout$/.exec(path);
+    const checkout=/^\/api\/kennels\/([^/]+)\/(square-checkout|square-sandbox-checkout)$/.exec(path);
     if(checkout&&req.method==='POST'){
       const scope=checkout[1].toLowerCase();
       if(!uuid(scope))throw fail(400,'Invalid kennel');
@@ -116,7 +116,8 @@ export function createWebServer({backend=BACKEND,fetcher=fetch,secure=process.en
       const body=JSON.stringify({kennelID:scope,amountCents,customerName:customerName.trim(),description,reference,requestID:randomBytes(16).toString('hex')});
       const stamp=String(Date.now());
       const signature=createHmac('sha256',secret).update(stamp+'.'+body).digest('hex');
-      const result=await fetcher('https://kennelflow-payments.onrender.com/kennelflow/checkout',{
+      const destination=checkout[2]==='square-sandbox-checkout'?'https://kennelflow-square-sandbox.onrender.com':'https://kennelflow-payments.onrender.com';
+      const result=await fetcher(destination+'/kennelflow/checkout',{
         method:'POST',headers:{'Content-Type':'application/json','X-KF-Timestamp':stamp,'X-KF-Signature':signature},
         body,redirect:'manual',signal:AbortSignal.timeout(20000)
       });
