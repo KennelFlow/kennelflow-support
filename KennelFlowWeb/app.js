@@ -114,8 +114,10 @@ function renderSpecialized(type,list){
   // Reuse the live payment form across cloud polling; rebuilding it cleared typed values every 15 seconds.
   if(type==='payments'&&host.dataset.activeType==='payments'&&host.querySelector('form')){
     const active=list.filter(r=>!r.deleted_at);
+    const realPayments=active.filter(r=>!String(r.record?.method||'').includes('Sandbox'));
+    const testPayments=active.filter(r=>String(r.record?.method||'').includes('Sandbox'));
     const summary=host.querySelector('[data-payment-summary]');
-    if(summary)summary.textContent=active.length+' payment records · Recorded total: '+new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(active.reduce((n,r)=>n+(Number(r.record?.amount)||0),0));
+    if(summary)summary.textContent=realPayments.length+' real payment records · Recorded total: '+new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(realPayments.reduce((n,r)=>n+(Number(r.record?.amount)||0),0))+' · '+testPayments.length+' sandbox test records (excluded from revenue)';
     return;
   }
   host.dataset.activeType=type;
