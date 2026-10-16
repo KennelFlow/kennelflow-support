@@ -179,7 +179,8 @@ export function installKennelFlowOrderNotificationRoutes(app,config){
         if(!verification.ok)throw Error('Unable to independently verify completed Square payment');
         const confirmed=(await verification.json()).payment;
         if(confirmed?.status!=='COMPLETED'||confirmed.order_id!==order.id||confirmed.location_id!==config.configuredLocationID||Number(confirmed.amount_money?.amount)!==Number(order.total_money?.amount))throw Error('Square service payment verification mismatch');
-        await settlePayment({orderID:order.id,paymentID:confirmed.id,amountCents:Number(confirmed.amount_money.amount),environment:config.isProduction?'production':'sandbox'});
+        const outcome=await settlePayment({orderID:order.id,paymentID:confirmed.id,amountCents:Number(confirmed.amount_money.amount),environment:config.isProduction?'production':'sandbox'});
+        console.info('KennelFlow Square webhook settlement',{saved:!!outcome.saved,alreadyRecorded:!!outcome.alreadyRecorded,ignored:!!outcome.ignored,environment:config.isProduction?'production':'sandbox'});
         return res.sendStatus(200);
       }
       const details=orderDetails(order,payment,config.stores);
