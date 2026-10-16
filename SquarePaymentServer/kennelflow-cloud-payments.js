@@ -20,7 +20,7 @@ export async function settlePayment({orderID,paymentID,amountCents,environment})
   if(pending.status==='COMPLETED'){if(pending.payment_id!==paymentID)throw Error('Conflicting Square payment ID');await c.query('COMMIT');return {alreadyRecorded:true}};
   const hex=crypto.createHash('sha256').update('kf-square-'+environment+'-'+paymentID).digest('hex');
   const id=[hex.slice(0,8),hex.slice(8,12),'4'+hex.slice(13,16),'a'+hex.slice(17,20),hex.slice(20,32)].join('-');
-  const record={id,customerName:pending.customer_name,puppyName:'',date:new Date().toISOString().replace(/\\.\\d{3}Z$/,'Z'),amount:amountCents/100,method:environment==='sandbox'?'Square Sandbox — TEST ONLY':'Square',reference:paymentID,notes:'Verified Square order '+orderID};
+  const record={id,customerName:pending.customer_name,puppyName:'',date:new Date().toISOString().slice(0,19)+'Z',amount:amountCents/100,method:environment==='sandbox'?'Square Sandbox — TEST ONLY':'Square',reference:paymentID,notes:'Verified Square order '+orderID};
   const payload={platform:'ios',collection:'payments',record};
   const inserted=await c.query('INSERT INTO public.kennel_records(id,kennel_id,record_type,payload) VALUES($1,$2,$3,$4::jsonb) ON CONFLICT(kennel_id,id) DO NOTHING RETURNING id',[id,pending.kennel_id,'payments',JSON.stringify(payload)]);
   if(!inserted.rowCount){const existing=(await c.query('SELECT payload FROM public.kennel_records WHERE kennel_id=$1 AND id=$2',[pending.kennel_id,id])).rows[0];if(existing?.payload?.record?.reference!==paymentID)throw Error('Existing payment record conflict')}
