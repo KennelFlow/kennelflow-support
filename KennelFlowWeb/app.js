@@ -141,6 +141,37 @@ function renderSpecialized(type,list){
     panel.append(el('h3','Payment ledger'),el('p','These are saved payment records, not live Square transactions. To charge a card, use the authorized payment flow in the app.','muted'));
     const money=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(value);const paymentSummary=el('p',realPayments.length+' real payment records · Recorded total: '+money(amount(realPayments,'amount'))+' · '+testPayments.length+' sandbox test records (excluded from revenue)','muted');paymentSummary.dataset.paymentSummary='true';panel.append(paymentSummary);
     if(['owner','admin'].includes(role)){
+      // Browser-local pending list. Pending requests must never be written to the paid ledger.
+      const pendingKey='kennelflow.pendingSquare.'+kennel;
+      const readPending=()=>{try{const records=JSON.parse(localStorage.getItem(pendingKey)||'[]');return Array.isArray(records)?records.filter(x=>x&&typeof x.orderID==='string').slice(0,100):[]}catch{return []}};
+      const writePending=records=>{try{localStorage.setItem(pendingKey,JSON.stringify(records.slice(0,100)))}catch{}};
+      const pendingPanel=el('section',undefined,'specialized-panel');
+      const pendingHeading=el('h3','Pending Square checkouts (this browser only)');
+      const pendingHelp=el('p','Unpaid requests are not revenue. These requests stay on this browser; syncing them to iPhone requires cloud support.','muted');
+      const pendingItems=el('div');
+      const drawPending=()=>{
+        pendingItems.replaceChildren();
+        const records=readPending();
+        if(!records.length){pendingItems.append(el('p','No pending checkouts saved on this browser.','muted'));return}
+        for(const entry of records){
+          const box=el('div',undefined,'record-card');
+          box.append(el('strong',entry.customerName+' — '+money(entry.amountCents/100)),el('p','Reference: '+(entry.reference||'none')+' · Created '+new Date(entry.createdAt).toLocaleString()));
+          const link=el('a','Open Square checkout');link.href=entry.url;link.target='_self';link.rel='noopener noreferrer';box.append(link);
+          const status=el('p','Pending — no payment recorded');
+          const verify=button('Check payment',async()=>{
+            verify.disabled=true;status.textContent='Checking Square…';
+            try{
+              const result=await api('kennels/'+kennel+'/square-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderID:entry.orderID,amountCents:entry.amountCents,customerName:entry.customerName})});
+              if(result.saved||result.alreadyRecorded){writePending(readPending().filter(x=>x.orderID!==entry.orderID));status.textContent='Paid and recorded. Refreshing…';await load(true)}
+              else status.textContent='Still unpaid: '+(result.status||'unknown');
+            }catch(error){status.textContent='Status check failed: '+error.message}
+            finally{verify.disabled=false}
+          });
+          const remove=button('Remove from this browser',()=>{writePending(readPending().filter(x=>x.orderID!==entry.orderID));drawPending()});
+          box.append(verify,remove,status);pendingItems.append(box);
+        }
+      };
+      pendingPanel.append(pendingHeading,pendingHelp,pendingItems);panel.append(pendingPanel);drawPending();
       const form=el('form',undefined,'employee-form');
       const customer=el('input'),sum=el('input'),detail=el('input'),reference=el('input'),submit=el('button','LIVE Square checkout — real payments'),feedback=el('p');
       customer.placeholder='Customer name';customer.required=true;sum.type='number';sum.step='0.01';sum.min='1';sum.placeholder='Amount (USD)';sum.required=true;
@@ -153,6 +184,7 @@ function renderSpecialized(type,list){
         try{const data=await api('kennels/'+kennel+'/square-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amountCents,customerName:customer.value,description:detail.value,reference:reference.value})});
           feedback.replaceChildren(el('span','Checkout link created. Payment is not yet confirmed. Share this link with the customer: '));
           const anchor=el('a','Open Square checkout');anchor.href=data.url;anchor.target='_self';anchor.rel='noopener noreferrer';feedback.append(anchor);
+          writePending([{orderID:data.orderID,url:data.url,amountCents,customerName:customer.value.trim(),reference:reference.value.trim(),createdAt:new Date().toISOString()},...readPending().filter(x=>x.orderID!==data.orderID)]);drawPending();
           const liveStatus=el('p','Payment not yet verified.');
           liveStatus.setAttribute('role','status');liveStatus.setAttribute('aria-live','polite');
           const liveVerify=button('Verify live Square payment',async()=>{
