@@ -1,10 +1,13 @@
+import {createEmployees} from './employees.mjs';
 import {models,collections,canRead,canWrite,newRecord,normalizedRow,recordName,validateModel,isoDate,uuid} from './records.mjs';
 const $=id=>document.getElementById(id);
 const labels={dogs:'Dogs',puppies:'Puppies',litters:'Litters',breedingRecords:'Breeding records',healthRecords:'Health records',puppyMedicalRecords:'Puppy medical records',customers:'Puppy buyers',clients:'Clients',tasks:'Tasks',training:'Training',equipment:'Equipment',kennels:'Kennels / areas',documents:'Photos & documents',contracts:'Contracts',payments:'Payments',groomingRecords:'Grooming',feedingPlans:'Feeding plans',supplementRecords:'Supplements',semenRecords:'Semen records',scanFolders:'Report folders',scannedReports:'Scanned reports',boardingRecords:'Boarding',calendarEvents:'Calendar events',employeeActivity:'Employee activity',staffTimeEntries:'Staff time entries',kennelCareSessions:'Kennel care',expenses:'Expenses',dailyDutyShifts:'Duty categories',dailyDutyTemplates:'Duty templates',dailyDutyRecords:'Duty records',smartTags:'QR / NFC assignments',inventoryLocations:'Inventory locations',inventoryItems:'Inventory items',travelManifests:'Travel manifests',inventoryScans:'Inventory scans',inventoryReports:'Inventory reports',smartPlacements:'Tag placements'};
-const groups={Overview:[],'Dogs':['dogs'],'Puppies & Litters':['puppies','litters'],'Breeding':['breedingRecords','semenRecords'],'Kennels & Care':['kennels','kennelCareSessions'],'Clients & Boarding':['clients','boardingRecords','customers'],'Health & Grooming':['healthRecords','puppyMedicalRecords','groomingRecords'],'Feeding & Supplements':['feedingPlans','supplementRecords'],'Daily Duties':['dailyDutyRecords','dailyDutyTemplates','dailyDutyShifts'],'Calendar':['calendarEvents','tasks'],'Training':['training'],'Equipment & Inventory':['equipment','inventoryItems','inventoryLocations'],'Expenses & Payments':['expenses','payments'],'Contracts':['contracts'],'Photos & Documents':['documents','scannedReports','scanFolders'],'QR / NFC':['smartTags','smartPlacements'],'Travel & Reports':['travelManifests','inventoryScans','inventoryReports'],'Staff Records':['employeeActivity','staffTimeEntries']};
+const groups={Overview:[],'Dogs':['dogs'],'Puppies & Litters':['puppies','litters'],'Breeding':['breedingRecords','semenRecords'],'Kennels & Care':['kennels','kennelCareSessions'],'Clients & Boarding':['clients','boardingRecords','customers'],'Health & Grooming':['healthRecords','puppyMedicalRecords','groomingRecords'],'Feeding & Supplements':['feedingPlans','supplementRecords'],'Daily Duties':['dailyDutyRecords','dailyDutyTemplates','dailyDutyShifts'],'Calendar':['calendarEvents','tasks'],'Training':['training'],'Equipment & Inventory':['equipment','inventoryItems','inventoryLocations'],'Expenses & Payments':['expenses','payments'],'Contracts':['contracts'],'Photos & Documents':['documents','scannedReports','scanFolders'],'QR / NFC':['smartTags','smartPlacements'],'Travel & Reports':['travelManifests','inventoryScans','inventoryReports'],'Staff Records':['employeeActivity','staffTimeEntries'],'Employees':[]};
 const referenceTypes={puppyID:['puppies'],litterID:['litters'],linkedLitterID:['litters'],linkedDogID:['dogs'],linkedPuppyID:['puppies'],dogID:['dogs'],kennelID:['kennels'],areaID:['kennels','inventoryLocations'],vehicleAreaID:['inventoryLocations'],placementID:['smartPlacements'],clientID:['clients'],templateID:['dailyDutyTemplates'],folderID:['scanFolders'],tagID:['smartTags'],containerTagID:['smartTags'],tripID:['travelManifests'],itemID:['inventoryItems']};
+let teamMembers=[];
 let rows=new Map(),identity=null,kennels=[],kennel='',role='',active='Overview',loading=false,loadSequence=0,editor=null,saving=false;
 let month=new Date(new Date().getFullYear(),new Date().getMonth(),1),selectedDay='';
+const employees=createEmployees({host:$('employeesPanel'),api,state:()=>({rows,identity,kennel,role}),onMembers:value=>{teamMembers=value},onError:e=>{message(e.message);if(e.status===401)requireLogin()},refresh:()=>load(),edit:row=>openEditor(row),add:type=>openEditor(null,type)});
 const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n};
 const button=(text,action,cls='secondary')=>{const n=el('button',text,cls);n.type='button';n.addEventListener('click',action);return n};
 const human=key=>key.replace(/([a-z])([A-Z])/g,'$1 $2').replace(/ID(s)?$/,' reference$1').replace(/^./,x=>x.toUpperCase());
@@ -21,7 +24,7 @@ async function api(path,options={}) {
 async function init(){
   try{
     const value=await api('me');
-    if(identity?.id!==value.user.id||editor&&!value.kennels?.some(k=>k.id===editor.kennel)){rows.clear();closeEditor(true)}
+    if(identity?.id!==value.user.id||editor&&!value.kennels?.some(k=>k.id===editor.kennel)){rows.clear();teamMembers=[];employees.reset();closeEditor(true)}
     identity=value.user;kennels=value.kennels||[];
     $('kennel').replaceChildren(...kennels.map(k=>{const o=el('option',k.name);o.value=k.id;return o}));
     if(!kennels.some(k=>k.id===kennel))kennel=kennels[0]?.id||'';
@@ -32,7 +35,7 @@ async function init(){
   }catch(e){$('login').hidden=false;$('workspace').hidden=true;setConnection('Sign in to connect');if(e.status!==401)message(e.message)}
 }
 async function load(silent=false){
-  if(!kennel)return;
+  if(!kennel||invitationMode)return;
   const sequence=++loadSequence,scope=kennel;loading=true;$('refresh').disabled=true;
   if(!silent)setConnection('Syncing cloud records…');
   try{
@@ -48,22 +51,24 @@ async function load(silent=false){
       for(const raw of data.records){const row=normalizedRow(raw);if(!uuid(row.id)||!Number.isSafeInteger(row.revision)||row.revision<1)throw Error('Invalid cloud record');if(!next.has(row.id)||next.get(row.id).revision<row.revision)next.set(row.id,row)}
       cursor=data.nextCursor||null;if(cursor&&seen.has(cursor))throw Error('Cloud paging repeated. Try refresh again.');if(cursor)seen.add(cursor);
     }while(cursor);
+    const team=['owner','admin'].includes(role)?await api(`kennels/${scope}/members`):{members:[]};
     if(sequence!==loadSequence)return;
+    teamMembers=team.members;
     rows=next;$('kennelName').textContent=membership.name;$('identity').textContent=`${identity.name||identity.email} · ${human(role)}`;
     setConnection('Synced '+new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}));
-    if(!silent)message();render();
+    if(!silent)message();render(silent);
     if(editor&&!saving){const latest=rows.get(editor.id);if(latest&&latest.revision!==editor.revision)showConflict(latest)}
   }catch(e){if(sequence===loadSequence){setConnection(e.status===401?'Sign in again':'Connection interrupted');if(!silent||e.status===401)message(e.message);if(e.status===401)requireLogin()}}
   finally{if(sequence===loadSequence){loading=false;$('refresh').disabled=false}}
 }
-function visibleGroups(){return Object.entries(groups).filter(([name,types])=>name==='Overview'||types.some(t=>canRead(role,t)))}
+function visibleGroups(){return Object.entries(groups).filter(([name,types])=>name==='Overview'||name==='Employees'&&!!role||types.some(t=>canRead(role,t)))}
 function selectSection(name){active=name;selectedDay='';renderNav();renderPanel()}
 function renderNav(){
   $('nav').replaceChildren();
   if(!visibleGroups().some(([name])=>name===active))active='Overview';
   for(const [name] of visibleGroups()){const b=button(name,()=>selectSection(name),'');b.classList.toggle('active',name===active);b.setAttribute('aria-current',name===active?'page':'false');$('nav').append(b)}
 }
-function render(){renderNav();renderOverview();renderPanel()}
+function render(background=false){renderNav();renderOverview();renderPanel(background)}
 function renderOverview(){
   const box=$('overview');box.replaceChildren();const intro=el('section',undefined,'intro');intro.append(el('p','ONE CONNECTED KENNEL','eyebrow'),el('h2','Your records, wherever you work'),el('p','Manage shared records here and continue in the KennelFlow app. Open devices check for updates automatically. If both devices change a record, you choose which changes to keep.'));box.append(intro);
   const grid=el('div',undefined,'metrics');
@@ -71,8 +76,8 @@ function renderOverview(){
   box.append(grid);
   if(!rows.size)box.append(el('p','No shared records yet. Connect this Business account in your app and sync existing records, or add a record here.','card'));
 }
-function renderPanel(){
-  const overview=active==='Overview';$('overview').hidden=!overview;$('recordsPanel').hidden=overview;if(overview)return;
+function renderPanel(background=false){
+  const overview=active==='Overview',staff=active==='Employees';$('overview').hidden=!overview;$('recordsPanel').hidden=overview||staff;$('employeesPanel').hidden=!staff;if(staff){employees.render(background);return}if(overview)return;
   const selection=$('collection').value,types=groups[active].filter(t=>canRead(role,t));
   $('collection').replaceChildren(...types.map(t=>{const o=el('option',labels[t]);o.value=t;return o}));
   if(types.includes(selection))$('collection').value=selection;
@@ -113,8 +118,8 @@ function renderCalendar(type,list){
   if(selectedDay)box.append(button('Show all dates',()=>{selectedDay='';renderList()}));
 }
 function closeEditor(force=false){if(!force&&editor?.dirty&&!confirm('Discard your unsaved changes?'))return false;$('editor').close();editor=null;$('upload').value='';return true}
-function openEditor(row){
-  const type=row?.type||chosen();if(!canWrite(role,type))return;
+function openEditor(row,typeOverride){
+  const type=row?.type||typeOverride||chosen();if(!canWrite(role,type))return;
   const record=row?structuredClone(row.record):newRecord(collections[type]);
   if(!record){message('This record has an unsupported format. Its cloud copy was preserved.');return}
   if(!row&&type==='calendarEvents'&&selectedDay)record.startDate=isoDate(selectedDay+'T09:00:00');
@@ -130,13 +135,17 @@ function renderObject(model,object,parent){
     const label=el('label',human(field.key)),value=object[field.key],type=field.type;
     if(type.startsWith('[')){parent.append(renderArray(field,object));continue}
     let control;
-    if(field.options||type==='Bool'&&field.optional||type==='UUID'){
+    if(field.key==='assignedTo'&&teamMembers.length){
+      control=el('select');const blank=el('option','Unassigned');blank.value='';control.append(blank);
+      const names=[...new Set(teamMembers.map(m=>m.name||m.email))];if(value&&!names.includes(value))names.unshift(value);
+      for(const name of names){const option=el('option',name);option.value=name;control.append(option)}control.value=value||'';
+    }else if(field.options||type==='Bool'&&field.optional||type==='UUID'){
       control=el('select');if(field.optional||type==='UUID'){const blank=el('option',field.optional?'None':'Choose a record');blank.value='';control.append(blank)}
       let options=field.options?.map(v=>[v,v])||[];
       if(type==='Bool')options=[['true','Yes'],['false','No']];
       if(type==='UUID'){
         options=[...rows.values()].filter(r=>!r.deleted_at&&r.id!==editor.id&&(!referenceTypes[field.key]||referenceTypes[field.key].includes(r.type))).map(r=>[r.id,recordName(r.record)+' · '+labels[r.type]]);
-        if(field.key==='staffID')options.push([identity.id,identity.name||identity.email]);
+        if(field.key==='staffID')options=(teamMembers.length?teamMembers:[identity]).map(m=>[m.id,m.name||m.email]);
         if(value&&!options.some(([id])=>id.toLowerCase()===String(value).toLowerCase()))options.unshift([value,'Existing reference · '+value]);
       }
       for(const [v,text] of options){const option=el('option',text);option.value=v;control.append(option)}control.value=value==null?'':String(value);
@@ -199,10 +208,16 @@ $('loginForm').addEventListener('submit',async e=>{e.preventDefault();$('loginBu
 function requireLogin(){if(!$('reauth').open){$('reauthEmail').value=identity?.email||'';$('reauthError').textContent='';$('reauth').showModal()}}
 $('reauthForm').addEventListener('submit',async e=>{e.preventDefault();$('reauthSubmit').disabled=true;try{await api('login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('reauthEmail').value,password:$('reauthPassword').value})});$('reauthPassword').value='';$('reauth').close();await init();if(editor)$('editStatus').textContent='Signed in. Your unsaved changes are preserved.'}catch(e){$('reauthError').textContent=e.message}finally{$('reauthSubmit').disabled=false}});
 $('reauthCancel').addEventListener('click',()=>$('reauth').close());
-$('logout').addEventListener('click',async()=>{if(!closeEditor())return;try{await api('logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})}finally{loadSequence++;rows.clear();identity=null;kennel='';role='';$('workspace').hidden=true;$('login').hidden=false;$('overview').replaceChildren();$('list').replaceChildren();message();setConnection('Signed out')}});
-$('kennel').addEventListener('change',async()=>{if(!closeEditor()){$('kennel').value=kennel;return}kennel=$('kennel').value;rows.clear();role='';render();await load()});
+$('logout').addEventListener('click',async()=>{if(!closeEditor())return;try{await api('logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})}finally{loadSequence++;employees.reset();teamMembers=[];rows.clear();identity=null;kennel='';role='';$('workspace').hidden=true;$('login').hidden=false;$('overview').replaceChildren();$('list').replaceChildren();message();setConnection('Signed out')}});
+$('kennel').addEventListener('change',async()=>{if(!closeEditor()){$('kennel').value=kennel;return}employees.reset();teamMembers=[];kennel=$('kennel').value;rows.clear();role='';render();await load()});
 $('refresh').addEventListener('click',()=>load());$('add').addEventListener('click',()=>openEditor());$('collection').addEventListener('change',()=>{selectedDay='';renderList()});$('search').addEventListener('input',renderList);$('deleted').addEventListener('change',renderList);$('recordForm').addEventListener('submit',save);$('closeEditor').addEventListener('click',()=>closeEditor());$('cancelEditor').addEventListener('click',()=>closeEditor());$('editor').addEventListener('cancel',e=>{e.preventDefault();if(!saving)closeEditor()});$('upload').addEventListener('change',dirty);$('print').addEventListener('click',()=>{document.querySelectorAll('#list details').forEach(d=>d.open=true);window.print()});
 window.addEventListener('beforeunload',e=>{if(editor?.dirty){e.preventDefault();e.returnValue=''}});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&identity&&!loading&&!saving)load(true)});
 setInterval(()=>{if(!document.hidden&&identity&&!loading&&!saving&&!$('reauth').open)load(true)},15000);
-init();
+let invitationMode=false;
+function showJoin(){invitationMode=true;$('join').hidden=false;$('login').hidden=true;$('workspace').hidden=true}
+$('showJoin').onclick=showJoin;
+$('joinBack').onclick=()=>{invitationMode=false;$('join').hidden=true;$('joinPassword').value='';init()};
+$('joinForm').onsubmit=async e=>{e.preventDefault();$('joinSubmit').disabled=true;try{await api('invitations/accept',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:$('joinToken').value.trim(),email:$('joinEmail').value.trim(),name:$('joinName').value.trim(),password:$('joinPassword').value})});await api('logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});employees.reset();identity=null;rows.clear();teamMembers=[];kennel='';role='';invitationMode=false;$('joinPassword').value='';$('joinToken').value='';$('join').hidden=true;$('login').hidden=false;message('Invitation accepted. Sign in with your Business account to start work.');$('email').value=$('joinEmail').value}catch(e){$('joinPassword').value='';$('joinStatus').textContent=e.message}finally{$('joinSubmit').disabled=false}};
+const incoming=new URLSearchParams(window.location.hash.slice(1)).get('invite');
+if(incoming&&/^[a-f0-9]{64}$/.test(incoming)){$('joinToken').value=incoming;window.history.replaceState(null,'','/');showJoin()}else init();

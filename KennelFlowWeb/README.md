@@ -6,6 +6,11 @@ Run `node server.mjs` (Render supplies `PORT`). Runtime dependencies: Node.js 24
 
 ## Behavior
 
+- **Employees**: owners/admins can create 48-hour invitations, view pending invitations, cancel them, manage permitted roles, and remove access. The owner role is protected; admins cannot manage other admins. The website produces a private invitation link to share directly; it does not email employees automatically. Invitees use their existing Business password or create their own account through the acceptance form. Tokens are carried in a URL fragment, immediately removed from the address bar, and never persisted in browser storage.
+- Employees can clock themselves in/out using database timestamps. Repeated clock-in requests reuse the open entry. Owners/admins can review, correct, and print hours for a date range and select employees when recording time or assigning tasks. Open entries count elapsed time through the selected period. Corrections retain record revisions and work history.
+- The backend captures every future cloud record save in an append-only work-history table, including app-originated sync writes, completion changes, soft deletion, restoration, and time corrections. Entries use the authenticated account, not a name supplied by the browser. Historical changes before migration 009 are not reconstructed. Device-only/offline actions appear when uploaded by their authenticated Business account.
+- Staff/viewers see only their own personal history and time records. Financial, contract, customer, and document permissions retain the existing restrictions. Staff cannot directly edit time entries or another employee's clock. Permission changes invalidate existing sessions; removal preserves historical records.
+
 - Authenticate through the existing Business login; keep bearer tokens on the server, with HttpOnly, Secure, SameSite=Strict browser cookies in Render.
 - Obtain kennel memberships through `/v2/me`, matching the native client. The Business API does not expose a standalone `/v2/kennels` list route.
 - Check membership and role on each write. The upstream API and database remain authoritative for authorization, attribution and revisions.
@@ -23,5 +28,7 @@ Run `node server.mjs` (Render supplies `PORT`). Runtime dependencies: Node.js 24
 - The actual Build 112 `KennelSyncClient` downloaded a website change from the development backend, wrote the next revision and received HTTP 409 for a stale write.
 
 ## Scope
+
+The employee backend source and additive migration are in `../BusinessBackend`. Apply migration 009 to an isolated development branch first, then deploy the updated API/repository modules through the existing function adapter, preserving its legacy routes and restricted database identity. Run the backend SQL/security suite with `npm ci && npm test`; run the explicit development-only employee integration suite with `node --use-env-proxy tests/employees-integration.mjs`. Production credentials and function adapter secrets are never committed.
 
 Cloud management applies to records enrolled in KennelFlow Business. Device-only records appear after their original device connects and syncs. These changes do not implement browser-native NFC programming, replace camera/document scanning hardware flows, or add device-local data that the existing Business API does not synchronize. Native notifications and background execution follow the native app's existing behavior. No native source changes or App Store build are required for the 37 existing supported collections.

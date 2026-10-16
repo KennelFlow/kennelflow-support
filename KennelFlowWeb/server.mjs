@@ -35,14 +35,14 @@ export function createWebServer({backend=BACKEND,fetcher=fetch,secure=process.en
     if(!k||!['owner','admin','staff','viewer'].includes(k.role))throw fail(403,'No access to this kennel');
     return k;
   }
-  const files={'/':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','text/javascript'],'/records.mjs':['records.mjs','text/javascript'],'/schema.mjs':['schema.mjs','text/javascript'],'/styles.css':['styles.css','text/css']};
+  const files={'/':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','text/javascript'],'/employees.mjs':['employees.mjs','text/javascript'],'/records.mjs':['records.mjs','text/javascript'],'/schema.mjs':['schema.mjs','text/javascript'],'/styles.css':['styles.css','text/css']};
   return http.createServer(async(req,res)=>{try{
     const url=new URL(req.url,'http://localhost'),path=url.pathname;
     res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');
     if(Object.hasOwn(files,path)&&['GET','HEAD'].includes(req.method)){
       const [file,type]=files[path];res.writeHead(200,{'Content-Type':type,'Cache-Control':'no-store','X-Frame-Options':'DENY','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' blob: data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"});res.end(req.method==='HEAD'?undefined:await readFile(new URL(file,import.meta.url)));return;
     }
-    if(path==='/health'&&req.method==='GET')return send(res,200,{ok:true,version:'web-management-1'});
+    if(path==='/health'&&req.method==='GET')return send(res,200,{ok:true,version:'web-employees-2'});
     if(!path.startsWith('/api/'))return send(res,404,{error:'Not found'});
     const unsafe=!['GET','HEAD'].includes(req.method),origin=req.headers.origin;
     if(origin){let parsed;try{parsed=new URL(origin)}catch{throw fail(403,'Origin not allowed')}if(parsed.host!==req.headers.host||!['http:','https:'].includes(parsed.protocol))throw fail(403,'Origin not allowed')}
@@ -57,6 +57,12 @@ export function createWebServer({backend=BACKEND,fetcher=fetch,secure=process.en
       sessions.delete(cookieID(req));const id=randomBytes(32).toString('hex');sessions.set(id,{token:value.token,created:Date.now()});
       return send(res,200,{ok:true},{'Set-Cookie':cookie(id,28800)});
     }
+    if(path==='/api/invitations/accept'&&req.method==='POST'){
+      const input=await json(req,16384);
+      const {token,email,name,password}=input;
+      if(!/^[a-f0-9]{64}$/.test(token||'')||typeof email!=='string'||email.length>254||typeof name!=='string'||!name.trim()||name.length>120||typeof password!=='string'||password.length<16||password.length>256)throw fail(400,'Enter your invitation, email, name, and a password of 16–256 characters');
+      return forward(res,await upstream('/v2/invitations/accept',null,'POST',{token,email,name,password}));
+    }
     const id=cookieID(req),s=sessions.get(id);
     if(path==='/api/logout'&&req.method==='POST'){
       sessions.delete(id);if(s)try{await upstream('/v2/logout',s.token,'POST',{})}catch{}
@@ -65,6 +71,34 @@ export function createWebServer({backend=BACKEND,fetcher=fetch,secure=process.en
     if(!s||Date.now()-s.created>SESSION_MS){sessions.delete(id);return send(res,401,{error:'Sign in required'})}
     if(path==='/api/me'&&req.method==='GET')return forward(res,await upstream('/v2/me',s.token));
     if(path==='/api/kennels'&&req.method==='GET'){const r=await upstream('/v2/me',s.token);const value=await r.json();return send(res,r.status,r.status===200?{kennels:value.kennels}:value)}
+    const employee=/^\/api\/kennels\/([^/]+)\/(members|invitations|clock|history)(?:\/([^/]+))?$/.exec(path);
+    if(employee){
+      const kennel=employee[1].toLowerCase(),resource=employee[2],target=employee[3]?.toLowerCase();
+      if(!uuid(kennel)||(target&&!uuid(target)))throw fail(400,'Invalid employee address');
+      const k=await membership(s.token,kennel);
+      if(['members','invitations'].includes(resource)&&!['owner','admin'].includes(k.role))throw fail(403,'Only an owner or admin can manage employees');
+      const upstreamPath=`/v2/kennels/${kennel}/${resource}`+(target?'/'+target:'');
+      if(req.method==='GET'&&!target){
+        const before=url.searchParams.get('before');if(before&&!/^[1-9][0-9]{0,17}$/.test(before))throw fail(400,'Invalid history cursor');
+        return forward(res,await upstream(upstreamPath+(resource==='history'&&before?'?before='+before:''),s.token));
+      }
+      if(resource==='invitations'&&req.method==='POST'&&!target){
+        const {email,role}=await json(req,16384);
+        if(typeof email!=='string'||email.length>254||!/^\S+@\S+\.\S+$/.test(email)||!['staff','viewer','admin'].includes(role)||k.role==='admin'&&role==='admin')throw fail(400,'Choose a valid email and permitted role');
+        return forward(res,await upstream(upstreamPath,s.token,'POST',{email,role}));
+      }
+      if(resource==='invitations'&&req.method==='DELETE'&&target)return forward(res,await upstream(upstreamPath,s.token,'DELETE'));
+      if(resource==='members'&&req.method==='PATCH'&&target){
+        const {role,remove}=await json(req,16384);
+        if(!['staff','viewer','admin'].includes(role)||typeof remove!=='boolean')throw fail(400,'Choose a valid employee role');
+        return forward(res,await upstream(upstreamPath,s.token,'PATCH',{role,remove}));
+      }
+      if(resource==='clock'&&req.method==='POST'&&!target){
+        const {action}=await json(req,16384);if(!['in','out'].includes(action))throw fail(400,'Choose clock in or clock out');
+        return forward(res,await upstream(upstreamPath,s.token,'POST',{action}));
+      }
+      throw fail(404,'Not found');
+    }
     if(path==='/api/records'&&req.method==='GET'){
       const kennel=(url.searchParams.get('kennel')||'').toLowerCase(),cursor=url.searchParams.get('cursor');
       if(!uuid(kennel)||cursor?.length>2048)throw fail(400,'Invalid kennel or page');

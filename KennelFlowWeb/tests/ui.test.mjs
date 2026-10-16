@@ -19,6 +19,7 @@ test('all forms, save, cross-device merge and session-expiry draft preservation'
     if(path==='/api/login'){expired=false;return response(200,{ok:true})}
     if(expired)return response(401,{error:'Sign in required'});
     if(path==='/api/me')return response(200,{user:{id:user,name:'Test owner',email:'test@example.invalid'},kennels:[{id:kennel,name:'Test kennel',role:'owner'}]});
+    if(path.endsWith('/members'))return response(200,{members:[{id:user,name:'Test owner',email:'test@example.invalid',role:'owner'}]});
     if(path.startsWith('/api/records?'))return response(200,{records:[...rows.values()].map(r=>structuredClone(r)),nextCursor:null});
     if(options.method==='PUT'&&path.includes('/records/')){const input=JSON.parse(options.body),id=path.split('/').pop(),previous=rows.get(id);if((previous?.revision||0)!==input.expectedRevision)return response(409,{error:'Conflict'});const row={id,type:input.type,data:{platform:'ios',collection:input.type,record:input.record},revision:input.expectedRevision+1,deleted_at:input.deletedAt||null,updated_at:'2026-10-15T13:00:00Z'};rows.set(id,row);writes++;return response(200,{record:row})}
     return response(404,{error:'Not found'});
@@ -26,9 +27,9 @@ test('all forms, save, cross-device merge and session-expiry draft preservation'
   const $=id=>document.getElementById(id),clickText=(root,text)=>{const b=[...root.querySelectorAll('button')].find(b=>b.textContent===text);assert.ok(b,text);b.click()},input=(control,value)=>{control.value=value;control.dispatchEvent(new window.Event('input',{bubbles:true}))};
   try{
     await import('../app.js');await until(()=>$('connection').textContent.startsWith('Synced'));
-    assert.equal($('workspace').hidden,false);assert.equal(document.querySelectorAll('.metric').length,17);
+    assert.equal($('workspace').hidden,false);assert.equal(document.querySelectorAll('.metric').length,18);
     let checked=0;
-    for(const nav of [...$('nav').querySelectorAll('button')].filter(b=>b.textContent!=='Overview')){
+    for(const nav of [...$('nav').querySelectorAll('button')].filter(b=>!['Overview','Employees'].includes(b.textContent))){
       const name=nav.textContent;clickText($('nav'),name);
       for(const option of [...$('collection').options]){
         $('collection').value=option.value;$('collection').dispatchEvent(new window.Event('change'));$('add').click();assert.ok($('editor').open,option.value);assert.ok($('fields').children.length>0,option.value);assert.ok($('fields').querySelector('input,select,textarea'),option.value);$('cancelEditor').click();checked++;

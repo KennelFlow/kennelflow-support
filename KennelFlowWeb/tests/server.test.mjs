@@ -12,10 +12,15 @@ async function setup(t,options={}){
   const fetcher=async(url,init={})=>{
     const path=new URL(url).pathname,method=init.method||'GET';state.calls.push({path,method});
     if(path==='/v2/login')return json(200,{token:'a'.repeat(64)});
+    if(path==='/v2/invitations/accept')return json(200,{ok:true});
     if(!state.valid)return json(401,{error:'Session expired'});
     if(path==='/v2/logout'){state.valid=false;return json(200,{ok:true})}
     if(path==='/v2/kennels')return json(200,{kennels:[{id:kennel,name:'Test kennel',role:state.role}]});
     if(path==='/v2/me')return json(200,{user:{id:other,name:'Test'},kennels:[{id:kennel,name:'Test kennel',role:state.role}]});
+    if(path.endsWith('/members')||path.includes('/members/'))return json(200,{members:[]});
+    if(path.includes('/invitations'))return json(200,{invitations:[]});
+    if(path.endsWith('/clock'))return json(state.role==='viewer'?403:200,{record:null});
+    if(path.endsWith('/history'))return json(200,{events:[],nextCursor:null});
     if(path.endsWith('/records')&&method==='GET')return json(200,{records:[...state.records.values()],nextCursor:null});
     if(path.includes('/records/')&&method==='PUT'){
       const input=JSON.parse(init.body),id=path.split('/').pop(),before=state.records.get(id);
@@ -84,4 +89,25 @@ test('document checksum validation, immutable upload conflicts and permissions',
   assert.equal((await upload('replacement')).status,409);
   state.badHash=true;assert.equal((await call(path)).status,502);state.badHash=false;
   state.role='viewer';assert.equal((await call(path)).status,403);assert.equal((await upload('test document')).status,403);
+});
+test('employee management proxy keeps authority on the backend and validates requests',async t=>{
+ const {call,state}=await setup(t);await call('/api/login','POST',{email:'x@test.invalid',password:'anything'});
+ const root=`/api/kennels/${kennel}`;
+ assert.equal((await call(root+'/members')).status,200);
+ assert.equal((await call(root+'/members/'+other,'PATCH',{role:'owner',remove:false})).status,400);
+ assert.equal((await call(root+'/invitations','POST',{email:'new@example.invalid',role:'staff'})).status,200);
+ assert.equal((await call(root+'/invitations','POST',{email:'bad',role:'staff'})).status,400);
+ state.role='admin';assert.equal((await call(root+'/invitations','POST',{email:'new@example.invalid',role:'admin'})).status,400);
+ state.role='staff';assert.equal((await call(root+'/members')).status,403);assert.equal((await call(root+'/invitations')).status,403);
+ assert.equal((await call(root+'/clock','POST',{action:'in',staffID:other})).status,200);
+ assert.equal((await call(root+'/clock','POST',{action:'change'})).status,400);
+ assert.equal((await call(root+'/history?before=bad')).status,400);
+ assert.equal((await call(`/api/kennels/${other}/history`)).status,403);
+ state.role='viewer';assert.equal((await call(root+'/clock','POST',{action:'in'})).status,403);
+});
+test('invitation acceptance supports new users without opening arbitrary backend routes',async t=>{
+ const {call}=await setup(t);const input={email:'employee@example.invalid',name:'Employee',password:'long test password 123',token:'b'.repeat(64)};
+ assert.equal((await call('/api/invitations/accept','POST',input)).status,200);
+ assert.equal((await call('/api/invitations/accept','POST',{...input,password:'short'})).status,400);
+ assert.equal((await call('/api/invitations/accept','POST',{...input,token:'broken'})).status,400);
 });
