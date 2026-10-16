@@ -85,7 +85,7 @@ app.post('/kennelflow/checkout', async (req,res)=>{
     const secret=process.env.KENNELFLOW_CHECKOUT_SECRET;
     const stamp=req.header('X-KF-Timestamp')||'',sig=req.header('X-KF-Signature')||'';
     if(!secret||secret.length<32)return res.status(503).json({error:'Secure kennel checkout is unavailable'});
-    if(!/^\\d{13}$/.test(stamp)||Math.abs(Date.now()-Number(stamp))>120000||!/^[a-f0-9]{64}$/.test(sig))return res.status(403).json({error:'Invalid checkout authorization'});
+    if(!/^\d{13}$/.test(stamp)||Math.abs(Date.now()-Number(stamp))>120000||!/^[a-f0-9]{64}$/.test(sig))return res.status(403).json({error:'Invalid checkout authorization'});
     const body=JSON.stringify(req.body);
     const expected=crypto.createHmac('sha256',secret).update(stamp+'.'+body).digest('hex');
     if(!crypto.timingSafeEqual(Buffer.from(sig,'hex'),Buffer.from(expected,'hex')))return res.status(403).json({error:'Invalid checkout authorization'});
@@ -112,7 +112,7 @@ app.post('/kennelflow/checkout-status',async(req,res)=>{
     const secret=process.env.KENNELFLOW_CHECKOUT_SECRET;
     const stamp=req.header('X-KF-Timestamp')||'',sig=req.header('X-KF-Signature')||'';
     if(!secret||secret.length<32)return res.status(503).json({error:'Secure verification unavailable'});
-    if(!/^\\d{13}$/.test(stamp)||Math.abs(Date.now()-Number(stamp))>120000||!/^[a-f0-9]{64}$/.test(sig))return res.status(403).json({error:'Unauthorized'});
+    if(!/^\d{13}$/.test(stamp)||Math.abs(Date.now()-Number(stamp))>120000||!/^[a-f0-9]{64}$/.test(sig))return res.status(403).json({error:'Unauthorized'});
     const expected=crypto.createHmac('sha256',secret).update(stamp+'.'+JSON.stringify(req.body)).digest('hex');
     if(!crypto.timingSafeEqual(Buffer.from(sig,'hex'),Buffer.from(expected,'hex')))return res.status(403).json({error:'Unauthorized'});
     const {orderID,amountCents}=req.body||{};
