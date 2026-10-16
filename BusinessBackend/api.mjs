@@ -126,6 +126,7 @@ export function createAPI(repo) { return { async fetch(request) {
    const input=await body(request);
    if(!validateRecord(input,id))return response(400,{error:'Invalid record identity or revision'});
    if(!canWrite(role,input.type))return response(403,{error:'Access denied'});
+   if(input.type==='maintenanceRecords' && !validUUID(input.data.record.kennelID))return response(400,{error:'Maintenance record requires its kennel area ID'});
    if(input.type==='staffTimeEntries'){
     const record=input.data.record,start=Date.parse(record.clockIn),end=record.clockOut==null?null:Date.parse(record.clockOut);
     if(!validUUID(record.staffID)||!Number.isFinite(start)||(end!==null&&(!Number.isFinite(end)||end<start)))return response(400,{error:'Valid employee and chronological clock times required'});

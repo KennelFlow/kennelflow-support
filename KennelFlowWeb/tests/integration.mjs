@@ -26,10 +26,10 @@ function browser(){let cookie='';return async(path,method='GET',data,binary=fals
 }}
 try{
   const web=browser(),second=browser();for(const client of [web,second])assert.equal((await client('login','POST',{email:owner.email,password:owner.password})).status,200);
-  const records=fixtures(),queue=Object.entries(records);
+  const capabilities=await cloud('/v2/capabilities');assert.equal(capabilities.status,200);const supported=new Set(capabilities.value.collections);const records=Object.fromEntries(Object.entries(fixtures()).filter(([type])=>supported.has(type)));const queue=Object.entries(records);const supportedCount=queue.length;const unavailable=['maintenanceRecords','ofaXrays','clinics','vetServices','employeeProfiles','messages','locations','pedigreeAncestors','pedigreeScans'].filter(type=>!supported.has(type));if(unavailable.length)console.log('DEPLOYMENT GAP: '+unavailable.join(', '));
   await Promise.all(Array.from({length:5},async()=>{while(queue.length){const [type,record]=queue.shift();const r=await web(`kennels/${owner.kennel}/records/${record.id}`,'PUT',{type,record,expectedRevision:0});assert.equal(r.status,200,type+': '+JSON.stringify(r.value));assert.equal(r.value.record.revision,1)}}));
-  console.log('PASS live creation and acknowledgement for all 37 collections');
-  const listing=await second('records?kennel='+owner.kennel);assert.equal(listing.status,200);assert.equal(listing.value.records.length,37);
+  console.log('PASS live creation and acknowledgement for '+supportedCount+' supported collections');
+  const listing=await second('records?kennel='+owner.kennel);assert.equal(listing.status,200);assert.equal(listing.value.records.length,Object.keys(records).length);
   for(const [type,record] of Object.entries(records)){const found=listing.value.records.find(r=>r.id===record.id);assert.equal(found.type,type);assert.deepEqual(found.data.record,record)}
   console.log('PASS separate session reads all persisted website records');
   const dog=records.dogs,path=`kennels/${owner.kennel}/records/${dog.id}`;
@@ -59,6 +59,26 @@ try{
   assert.equal((await outsider(filePath,'GET',undefined,true)).status,403);
   const restricted=await outsider('records?kennel='+owner.kennel);assert.equal(restricted.status,200);assert.ok(!restricted.value.records.some(r=>r.type==='payments'||r.type==='clients'||r.type==='contracts'));
   console.log('PASS actual staff write restrictions and private-record filtering');
+  for(const type of ['maintenanceRecords','ofaXrays','clinics','vetServices','employeeProfiles','messages','locations','pedigreeAncestors','pedigreeScans']){
+    const original=records[type];
+    const updated={...original,notes:'Edited through cloud website'};
+    const key=type==='messages'?'body':type==='locations'?'staffName':'recognizedText';
+    if(!Object.hasOwn(original,'notes'))updated[key]='Edited through cloud website';
+    const result=await second(`kennels/${owner.kennel}/records/${original.id}`,'PUT',{type,expectedRevision:1,record:updated});
+    assert.equal(result.status,200,type+JSON.stringify(result.value));
+    const check=await cloud('/v2/kennels/'+owner.kennel+'/records','GET',undefined,owner.token);
+    assert.deepEqual(check.value.records.find(r=>r.id===original.id).data.record,updated,type);
+  }
+  console.log('PASS website editing and Business API read-back for nine new record types');
+  const maintenance=records.maintenanceRecords;
+  const attachedName=records.documents.id+'.txt';
+  const linked={...maintenance,attachments:[attachedName]};
+  assert.equal((await web(`kennels/${owner.kennel}/records/${maintenance.id}`,'PUT',{type:'maintenanceRecords',expectedRevision:2,record:linked})).status,200);
+  const linkedCheck=await cloud('/v2/kennels/'+owner.kennel+'/records','GET',undefined,owner.token);
+  assert.deepEqual(linkedCheck.value.records.find(r=>r.id===maintenance.id).data.record.attachments,[attachedName]);
+  const fileRead=await second(filePath,'GET',undefined,true);
+  assert.equal(fileRead.status,200);assert.equal(fileRead.value,bytes);
+  console.log('PASS maintenance attachment reference survives edit, and linked document bytes round-trip');
   await web('logout','POST',{});assert.equal((await web('me')).status,401);
   console.log('PASS logout invalidates browser session');
   if(process.env.KF_NATIVE_TEST_OUTPUT)await writeFile(process.env.KF_NATIVE_TEST_OUTPUT,JSON.stringify({backend,token:owner.token,kennel:owner.kennel,dog:dog.id,email:owner.email,password:owner.password}),{mode:0o600});

@@ -44,8 +44,8 @@ async function setup(t,options={}){
   };
   return {state,call,base,server};
 }
-test('all 37 collections produce native-compatible typed records',()=>{
-  assert.equal(Object.keys(collections).length,37);
+test('all 46 collections produce native-compatible typed records',()=>{
+  assert.equal(Object.keys(collections).length,46);
   for(const [type,record] of Object.entries(fixtures()))assert.equal(validateModel(collections[type],record),null,type);
   const dog=fixture('Dog');dog.dateOfBirth='2026-10-15T12:00:00.000Z';assert.match(validateModel('Dog',dog),/dateOfBirth/);
   assert.equal(normalizedRow({id:dog.id.toUpperCase(),type:'dog',revision:'2',data:{dog}}).id,dog.id.toLowerCase());
