@@ -93,6 +93,7 @@ app.get('/health', (_, res) => res.json({ ok: true, environment: isProduction ? 
 app.get('/square/config', (_, res) => res.json({ environment: isProduction ? 'production' : 'sandbox', locationIDConfigured: Boolean(configuredLocationID), maxPaymentCents }));
 
 installKennelFlowOrderNotificationRoutes(app,{
+  isProduction,
   accessToken,
   configuredLocationID,
   squareApiBase,
