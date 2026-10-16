@@ -151,7 +151,7 @@ export function createWebServer({backend=BACKEND,fetcher=fetch,secure=process.en
         const recordID=createHash('sha256').update('kf-square-'+(paymentStatus[2]?'sandbox':'production')+'-'+data.paymentID).digest('hex');
         const identifier=[recordID.slice(0,8),recordID.slice(8,12),'4'+recordID.slice(13,16),'a'+recordID.slice(17,20),recordID.slice(20,32)].join('-');
         const method=paymentStatus[2]?'Square Sandbox — TEST ONLY':'Square';
-        const record={id:identifier,customerName:inputRecord.customerName,puppyName:'',date:new Date().toISOString(),amount:amountCents/100,method,reference:data.paymentID,notes:'Verified Square order '+verifiedOrderID+(paymentStatus[2]?' — SANDBOX TEST — NO REAL MONEY':'')};
+        const record={id:identifier,customerName:inputRecord.customerName,puppyName:'',date:new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),amount:amountCents/100,method,reference:data.paymentID,notes:'Verified Square order '+verifiedOrderID+(paymentStatus[2]?' — SANDBOX TEST — NO REAL MONEY':'')};
         const error=validateModel(collections.payments,record);
         if(error)throw fail(400,error);
         const saved=await upstream('/v2/kennels/'+scope+'/records/'+identifier,s.token,'PUT',{type:'payments',expectedRevision:0,data:{platform:'ios',collection:'payments',record}});
