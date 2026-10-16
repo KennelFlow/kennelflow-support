@@ -170,17 +170,23 @@ function renderSpecialized(type,list){
             }catch{message('Press and hold the checkout link, choose Copy Link, and paste it into Safari.');}
           });
           feedback.append(copyLink);
+          const verifyResult=el('p','No payment verification has been run yet.');
+          verifyResult.setAttribute('role','status');
+          verifyResult.setAttribute('aria-live','polite');
           const check=button('Verify Square test payment',async()=>{
+            if(check.disabled)return;
             check.disabled=true;
-            const result=el('p','Checking payment with Square…');
-            feedback.append(result);
+            check.textContent='Checking Square…';
+            verifyResult.textContent='Contacting Square for this checkout. Please wait (up to 25 seconds)…';
+            const controller=new AbortController();
+            const timeout=setTimeout(()=>controller.abort(),25000);
             try{
-              const v=await api('kennels/'+kennel+'/square-sandbox-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderID:data.orderID,amountCents,customerName:customer.value})});
-              result.textContent=v.paid?(v.saved?'Square confirmed payment and saved the TEST record in KennelFlow.':v.alreadyRecorded?'Square confirmed payment; record already exists.':'Square confirmed payment, but saving the record is not confirmed.'):'No completed Square sandbox payment was found. Status: '+(v.status||'unknown');
+              const v=await api('kennels/'+kennel+'/square-sandbox-status',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({orderID:data.orderID,amountCents,customerName:customer.value})});
+              verifyResult.textContent=v.paid?(v.saved?'Square confirmed payment and saved the TEST record in KennelFlow.':v.alreadyRecorded?'Square confirmed payment; record already exists.':'Square confirmed payment, but saving the record is not confirmed.'):'No completed Square sandbox payment was found. Status: '+(v.status||'unknown');
               if(v.saved)await load(true);
-            }catch(e){result.textContent='Verification failed: '+e.message}
-            finally{check.disabled=false}
-          });feedback.append(check);
+            }catch(e){verifyResult.textContent=e.name==='AbortError'?'Verification timed out. Square or cloud is taking too long; please retry.':'Verification failed: '+e.message}
+            finally{clearTimeout(timeout);check.textContent='Verify Square test payment';check.disabled=false}
+          });feedback.append(check,verifyResult);
         }catch(e){feedback.textContent=e.message}finally{sandboxButton.disabled=false}
       },'secondary');
       panel.append(el('h3','Request payment with Square'),form,sandboxButton,feedback);
