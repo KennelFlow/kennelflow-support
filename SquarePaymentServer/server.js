@@ -1,4 +1,4 @@
-import {putCheckout,getCheckouts,cloudReady} from './kennelflow-cloud-payments.js';
+import {putCheckout,getCheckouts,cloudReady,cloudDiagnostic} from './kennelflow-cloud-payments.js';
 import express from 'express';
 import crypto from 'crypto';
 import { Client, Environment } from 'square/legacy';
@@ -527,5 +527,6 @@ app.post('/yardpatrol/cancel-checkout', async (req,res) => {
 
 installYardPatrolPortalRoutes(app);
 
+void cloudDiagnostic().then(result=>console.info('KennelFlow checkout cloud diagnostic',result));
 const port=Number.parseInt(process.env.PORT||'3000',10);
 app.listen(port,'0.0.0.0',()=>console.log(`KennelFlow payment server running on port ${port} (${isProduction?'production':'sandbox'})`));
