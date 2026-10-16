@@ -171,9 +171,15 @@ function renderSpecialized(type,list){
           });
           feedback.append(copyLink);
           const check=button('Verify Square test payment',async()=>{
-            try{const v=await api('kennels/'+kennel+'/square-sandbox-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderID:data.orderID,amountCents,customerName:customer.value})});
-              message(v.paid?'Square confirmed sandbox payment COMPLETED (ID '+v.paymentID+'). '+(v.saved?'TEST record saved to KennelFlow.':v.alreadyRecorded?'TEST record already exists.':'Payment verified.'):'Square has not confirmed a completed payment. Status: '+v.status);if(v.saved)await load(true);
-            }catch(e){message(e.message)}
+            check.disabled=true;
+            const result=el('p','Checking payment with Square…');
+            feedback.append(result);
+            try{
+              const v=await api('kennels/'+kennel+'/square-sandbox-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderID:data.orderID,amountCents,customerName:customer.value})});
+              result.textContent=v.paid?(v.saved?'Square confirmed payment and saved the TEST record in KennelFlow.':v.alreadyRecorded?'Square confirmed payment; record already exists.':'Square confirmed payment, but saving the record is not confirmed.'):'No completed Square sandbox payment was found. Status: '+(v.status||'unknown');
+              if(v.saved)await load(true);
+            }catch(e){result.textContent='Verification failed: '+e.message}
+            finally{check.disabled=false}
           });feedback.append(check);
         }catch(e){feedback.textContent=e.message}finally{sandboxButton.disabled=false}
       },'secondary');
