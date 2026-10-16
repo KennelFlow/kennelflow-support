@@ -9,7 +9,7 @@ async function as(user,fn){await db.exec('SET ROLE kennelflow_api');try{await db
 const payload=(id,staffID=staff)=>JSON.stringify({platform:'ios',collection:'kennelCareSessions',record:{id,staffID,staffName:'Employee'}});
 before(async()=>{
  db=await PGlite.create();await db.exec('CREATE ROLE kennelflow_api NOSUPERUSER NOBYPASSRLS');
- for(const name of ['001_kennelflow.sql','002_revision_sync.sql','003_security_hardening.sql','004_auth.sql','005_access_control.sql','006_password_reset.sql','007_business.sql','008_files.sql','009_employees.sql'])await db.exec(await readFile(new URL('../schema/'+name,import.meta.url),'utf8'));
+ for(const name of ['001_kennelflow.sql','002_revision_sync.sql','003_security_hardening.sql','004_auth.sql','005_access_control.sql','006_password_reset.sql','007_business.sql','008_files.sql','009_employees.sql','010_business_profile.sql'])await db.exec(await readFile(new URL('../schema/'+name,import.meta.url),'utf8'));
  await db.exec(`GRANT USAGE ON SCHEMA public TO kennelflow_api;
  GRANT SELECT ON kennels,kennel_memberships,app_users TO kennelflow_api;
  GRANT SELECT,INSERT,UPDATE ON kennel_records,kennel_attachments TO kennelflow_api;
@@ -106,3 +106,15 @@ test('pending invitation listing never exposes tokens and cancellation prevents 
  await assert.rejects(db.query('SELECT business_accept($1,$2,$3,$4,$5)',[hash,'cancel@example.com','hash','Cancelled',uuid(72)]),e=>e.code==='42501');
 });
 
+
+test('owner profile edits are atomic, only owner can rename, and stale changes fail',async()=>{
+ const profile=[kennel,owner,'owner@example.com','One','updated.owner@example.com','New Owner','Updated Kennel','304-555-0141','100 Farm Road','https://example.org'];
+ await assert.rejects(as(staff,()=>db.query('SELECT business_update_profile($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',profile)),e=>e.code==='42501');
+ await as(owner,()=>db.query('SELECT business_update_profile($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',profile));
+ const u=(await db.query('SELECT email,display_name FROM app_users WHERE id=$1',[owner])).rows[0];
+ const k=(await db.query('SELECT name,contact_phone,contact_address,website FROM kennels WHERE id=$1',[kennel])).rows[0];
+ assert.equal(u.email,'updated.owner@example.com');assert.equal(u.display_name,'New Owner');
+ assert.equal(k.name,'Updated Kennel');assert.equal(k.contact_phone,'304-555-0141');assert.equal(k.website,'https://example.org');
+ await assert.rejects(as(owner,()=>db.query('SELECT business_update_profile($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',profile)),e=>e.code==='40001');
+ assert.equal((await db.query('SELECT name FROM kennels WHERE id=$1',[kennel])).rows[0].name,'Updated Kennel');
+});
