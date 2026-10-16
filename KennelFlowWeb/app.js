@@ -89,6 +89,7 @@ function renderList(){
   $('add').hidden=!canWrite(role,type);$('add').textContent='Add '+(labels[type]||'record').toLowerCase();
   let list=[...rows.values()].filter(r=>r.type===type&&(deleted?!!r.deleted_at:!r.deleted_at)&&(!term||JSON.stringify(r.record).toLowerCase().includes(term)));
   renderCalendar(type,list);
+  renderSpecialized(type,list);
   if(type==='calendarEvents'&&selectedDay)list=list.filter(r=>localDay(r.record?.startDate)===selectedDay);
   list.sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at)));
   $('count').textContent=`${list.length} ${deleted?'deleted ':''}record${list.length===1?'':'s'}${selectedDay?' · '+selectedDay:''}`;
@@ -107,6 +108,45 @@ function renderList(){
   }
   if(!list.length)$('list').append(el('p',deleted?'No deleted records.':'No records match this view.','empty'));
 }
+
+function renderSpecialized(type,list){
+  const host=$('specialized')||(()=>{const elHost=el('div');elHost.id='specialized';$('calendar').insertAdjacentElement('afterend',elHost);return elHost})();
+  host.replaceChildren();
+  if(type==='dailyDutyRecords'){
+    const today=localDay(new Date()),todayRecords=list.filter(r=>r.record?.dateKey===today);
+    const panel=el('section',undefined,'specialized-panel');panel.append(el('h3',"Today's duty checklist"),el('p',"Today's saved duties only. Completing a duty writes to the shared cloud record; other days remain in history.",'muted'));
+    for(const row of todayRecords){
+      const line=el('div',undefined,'specialized-line'),label=el('span',(row.record.shift||'Duty')+' · '+row.record.taskTitle);
+      line.append(label,el('span',row.record.completed?'Completed':'Pending','muted'));
+      if(canWrite(role,type))line.append(button(row.record.completed?'Reopen':'Complete',async()=>{
+        try{const finished=!row.record.completed;await write(row,{...row.record,completed:finished,...(finished?{completedAt:isoDate(Date.now())}:{completedAt:undefined})});await load(true);renderList()}
+        catch(e){message(e.message)}
+      }));
+      panel.append(line);
+    }
+    if(!todayRecords.length)panel.append(el('p','No duties are saved for today. Use Add duty records or manage duty templates.','muted'));
+    host.append(panel);
+  }
+  if(type==='payments'){
+    const live=list.filter(r=>!r.deleted_at),amount=key=>live.reduce((total,r)=>total+(Number(r.record?.[key])||0),0);
+    const panel=el('section',undefined,'specialized-panel');
+    panel.append(el('h3','Payment ledger'),el('p','These are saved payment records, not live Square transactions. To charge a card, use the authorized payment flow in the app.','muted'));
+    panel.append(el('p',live.length+' payment records · Review individual entries below.','muted'));host.append(panel);
+  }
+  if(type==='smartTags'){
+    const panel=el('section',undefined,'specialized-panel');panel.append(el('h3','QR / NFC assignment lookup'),el('p','Search by tag name, linked ID, or QR payload. This page does not write physical NFC tags. Use the iPhone app for NFC programming.','muted'));
+    const field=el('label','Tag or QR payload'),input=el('input');input.type='search';input.placeholder='Paste a scanned QR code or tag ID';field.append(input);
+    const result=el('div');input.addEventListener('input',()=>{
+      const value=input.value.trim().toLowerCase();result.replaceChildren();
+      if(!value)return;
+      const matches=list.filter(r=>!r.deleted_at&&Object.values(r.record||{}).some(v=>typeof v==='string'&&v.toLowerCase().includes(value)));
+      for(const row of matches.slice(0,10)){const match=el('div',undefined,'specialized-line');match.append(el('strong',recordName(row.record)),button('View / edit',()=>openEditor(row)));result.append(match)}
+      if(!matches.length)result.append(el('p','No matching saved assignments.','muted'));
+    });
+    panel.append(field,result);host.append(panel);
+  }
+}
+
 function displayValue(value,key){if(typeof value==='boolean')return value?'Yes':'No';if(Array.isArray(value))return value.map(x=>typeof x==='object'?Object.entries(x).filter(([k])=>k!=='id').map(([k,v])=>human(k)+': '+displayValue(v,k)).join(' · '):String(x)).join('\n');if(typeof value==='object')return JSON.stringify(value);if(typeof value==='string'&&/^\d{4}-\d\d-\d\dT/.test(value))return new Date(value).toLocaleString();return String(value)}
 function renderCalendar(type,list){
   const box=$('calendar');box.replaceChildren();if(type!=='calendarEvents')return;
