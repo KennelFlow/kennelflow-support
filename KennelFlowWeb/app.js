@@ -72,7 +72,7 @@ function render(background=false){renderNav();renderOverview();renderPanel(backg
 function renderOverview(){
   const box=$('overview');box.replaceChildren();const intro=el('section',undefined,'intro');intro.append(el('p','ONE CONNECTED KENNEL','eyebrow'),el('h2','Your records, wherever you work'),el('p','Manage shared records here and continue in the KennelFlow app. Open devices check for updates automatically. If both devices change a record, you choose which changes to keep.'));box.append(intro);
   const grid=el('div',undefined,'metrics');
-  for(const [name,types] of visibleGroups().filter(([name])=>name!=='Overview')){const b=button('',()=>selectSection(name),'metric'),count=[...rows.values()].filter(r=>types.includes(r.type)&&!r.deleted_at).length;b.append(el('h3',name),el('strong',String(count)),el('span','Shared records'));grid.append(b)}
+  for(const [name,types] of visibleGroups().filter(([name])=>name!=='Overview')){const b=button('',()=>selectSection(name),'metric'),count=[...rows.values()].filter(r=>types.includes(r.type)&&!r.deleted_at).length;b.append(el('h3',name),el('strong',name==='Employees'?(['owner','admin'].includes(role)?String(teamMembers.length):'Open'):String(count)),el('span',name==='Employees'?(['owner','admin'].includes(role)?'Team members':'Time & work history'):'Shared records'));grid.append(b)}
   box.append(grid);
   if(!rows.size)box.append(el('p','No shared records yet. Connect this Business account in your app and sync existing records, or add a record here.','card'));
 }

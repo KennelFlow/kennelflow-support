@@ -28,6 +28,7 @@ test('all forms, save, cross-device merge and session-expiry draft preservation'
   try{
     await import('../app.js');await until(()=>$('connection').textContent.startsWith('Synced'));
     assert.equal($('workspace').hidden,false);assert.equal(document.querySelectorAll('.metric').length,18);
+    const employeeMetric=[...document.querySelectorAll('.metric')].find(b=>b.querySelector('h3').textContent==='Employees');assert.equal(employeeMetric.querySelector('strong').textContent,'1');assert.match(employeeMetric.textContent,/Team members/);
     let checked=0;
     for(const nav of [...$('nav').querySelectorAll('button')].filter(b=>!['Overview','Employees'].includes(b.textContent))){
       const name=nav.textContent;clickText($('nav'),name);
