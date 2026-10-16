@@ -136,10 +136,10 @@ function renderSpecialized(type,list){
     host.append(panel);
   }
   if(type==='payments'){
-    const live=list.filter(r=>!r.deleted_at),amount=key=>live.reduce((total,r)=>total+(Number(r.record?.[key])||0),0);
+    const live=list.filter(r=>!r.deleted_at),realPayments=live.filter(r=>!String(r.record?.method||'').includes('Sandbox')),testPayments=live.filter(r=>String(r.record?.method||'').includes('Sandbox')),amount=(records,key)=>records.reduce((total,r)=>total+(Number(r.record?.[key])||0),0);
     const panel=el('section',undefined,'specialized-panel');
     panel.append(el('h3','Payment ledger'),el('p','These are saved payment records, not live Square transactions. To charge a card, use the authorized payment flow in the app.','muted'));
-    const paymentSummary=el('p',live.length+' payment records · Recorded total: '+new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(amount('amount')),'muted');paymentSummary.dataset.paymentSummary='true';panel.append(paymentSummary);
+    const money=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(value);const paymentSummary=el('p',realPayments.length+' real payment records · Recorded total: '+money(amount(realPayments,'amount'))+' · '+testPayments.length+' sandbox test records (excluded from revenue)','muted');paymentSummary.dataset.paymentSummary='true';panel.append(paymentSummary);
     if(['owner','admin'].includes(role)){
       const form=el('form',undefined,'employee-form');
       const customer=el('input'),sum=el('input'),detail=el('input'),reference=el('input'),submit=el('button','LIVE Square checkout — real payments'),feedback=el('p');
