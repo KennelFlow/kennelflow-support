@@ -1,4 +1,4 @@
-import {putCheckout,getCheckouts,cloudReady,cloudDiagnostic} from './kennelflow-cloud-payments.js';
+import {putCheckout,getCheckouts,cloudReady,cloudDiagnostic,settlePayment} from './kennelflow-cloud-payments.js';
 import express from 'express';
 import crypto from 'crypto';
 import { Client, Environment } from 'square/legacy';
@@ -203,7 +203,11 @@ app.post('/kennelflow/checkout-status',async(req,res)=>{
       const payment=(await response.json()).payment;
       if(payment?.status==='COMPLETED'&&payment?.order_id===orderID&&payment?.location_id===verifiedLocationID&&Number(payment?.amount_money?.amount)===amountCents){paid=true;paymentID=id;break}
     }
-    return res.json({paid,paymentID,orderID,status:paid?'COMPLETED':String(order?.state||'PENDING'),environment:isProduction?'production':'sandbox'});
+    let cloudSettlement=null;
+    if(paid&&cloudReady()){
+      cloudSettlement=await settlePayment({orderID,paymentID,amountCents,environment:isProduction?'production':'sandbox'});
+    }
+    return res.json({paid,paymentID,orderID,status:paid?'COMPLETED':String(order?.state||'PENDING'),environment:isProduction?'production':'sandbox',cloudSettlement:cloudSettlement?{saved:!!cloudSettlement.saved,alreadyRecorded:!!cloudSettlement.alreadyRecorded,ignored:!!cloudSettlement.ignored}:null});
   }catch{return res.status(502).json({error:'Square payment verification failed'})}
 });
 // Recover an already completed KennelFlow checkout by merchant reference.
