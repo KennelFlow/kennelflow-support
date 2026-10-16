@@ -111,6 +111,14 @@ function renderList(){
 
 function renderSpecialized(type,list){
   const host=$('specialized')||(()=>{const elHost=el('div');elHost.id='specialized';$('calendar').insertAdjacentElement('afterend',elHost);return elHost})();
+  // Reuse the live payment form across cloud polling; rebuilding it cleared typed values every 15 seconds.
+  if(type==='payments'&&host.dataset.activeType==='payments'&&host.querySelector('form')){
+    const active=list.filter(r=>!r.deleted_at);
+    const summary=host.querySelector('[data-payment-summary]');
+    if(summary)summary.textContent=active.length+' payment records · Recorded total: '+new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(active.reduce((n,r)=>n+(Number(r.record?.amount)||0),0));
+    return;
+  }
+  host.dataset.activeType=type;
   host.replaceChildren();
   if(type==='dailyDutyRecords'){
     const today=localDay(new Date()),todayRecords=list.filter(r=>r.record?.dateKey===today);
@@ -131,7 +139,7 @@ function renderSpecialized(type,list){
     const live=list.filter(r=>!r.deleted_at),amount=key=>live.reduce((total,r)=>total+(Number(r.record?.[key])||0),0);
     const panel=el('section',undefined,'specialized-panel');
     panel.append(el('h3','Payment ledger'),el('p','These are saved payment records, not live Square transactions. To charge a card, use the authorized payment flow in the app.','muted'));
-    panel.append(el('p',live.length+' payment records · Recorded total: '+new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(amount('amount')),'muted'));
+    const paymentSummary=el('p',live.length+' payment records · Recorded total: '+new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(amount('amount')),'muted');paymentSummary.dataset.paymentSummary='true';panel.append(paymentSummary);
     if(['owner','admin'].includes(role)){
       const form=el('form',undefined,'employee-form');
       const customer=el('input'),sum=el('input'),detail=el('input'),reference=el('input'),submit=el('button','Create secure Square checkout'),feedback=el('p');
