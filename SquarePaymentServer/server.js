@@ -30,6 +30,25 @@ if (!configuredLocationID) { console.error('Missing SQUARE_LOCATION_ID'); proces
 const environment = isProduction ? Environment.Production : Environment.Sandbox;
 const client = new Client({ bearerAuthCredentials: { accessToken }, environment });
 
+// Non-transactional sandbox startup verification (never logs credentials).
+if(!isProduction){
+  void (async()=>{
+    try{
+      const response=await fetch(squareApiBase+'/v2/locations',{headers:{Authorization:'Bearer '+accessToken,'Square-Version':squareApiVersion}});
+      const result=await response.json();
+      const active=(result.locations||[]).filter(location=>location.status==='ACTIVE'&&location.id);
+      console.info('KennelFlow Square sandbox credential check',{
+        httpStatus:response.status,
+        squareCode:response.ok?'OK':result.errors?.[0]?.code||'UNKNOWN',
+        activeLocationCount:active.length,
+        configuredLocationMatches:active.some(location=>location.id===configuredLocationID),
+        autoSelectSingleLocation:active.length===1
+      });
+    }catch(error){console.warn('KennelFlow Square sandbox credential check network failure',{reason:error?.name||'unknown'});}
+  })();
+}
+
+
 const PRODUCTS = Object.freeze({
   'dog-tag': { name: 'Smart Kennel Management Dog Tag', cents: 999 },
   'kennel-crate-tag': { name: 'Smart Kennel Management Kennel/Crate Tag', cents: 1499 },
