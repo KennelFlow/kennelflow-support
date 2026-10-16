@@ -170,6 +170,26 @@ function renderSpecialized(type,list){
           feedback.append(liveVerify,liveStatus);
         }catch(e){feedback.textContent='LIVE Square payments error: '+e.message+'. This is separate from sandbox testing.'}finally{submit.disabled=false}
       });
+      const recoveryMessage=el('p','Use the original Square reference to recover an already-paid checkout. No new charge will be created.');
+      recoveryMessage.setAttribute('role','status');
+      recoveryMessage.setAttribute('aria-live','polite');
+      const recover=button('Find completed Square payment by reference',async()=>{
+        const amountCents=Math.round(Number(sum.value)*100);
+        const lookup=reference.value.trim();
+        if(!customer.value.trim()||!lookup||!Number.isSafeInteger(amountCents)||amountCents<100){
+          recoveryMessage.textContent='Enter the original customer, payment amount, and invoice reference first.';return;
+        }
+        recover.disabled=true;
+        recoveryMessage.textContent='Searching Square for a completed payment. No charge is being made…';
+        const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),30000);
+        try{
+          const result=await api('kennels/'+kennel+'/square-recover',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({reference:lookup,amountCents,customerName:customer.value.trim()})});
+          recoveryMessage.textContent=result.saved?'Square payment found and saved to the KennelFlow ledger.':result.alreadyRecorded?'The payment was already recorded.':'Square confirmed a matching payment, but ledger storage needs review.';
+          if(result.saved)await load(true);
+        }catch(error){recoveryMessage.textContent=error.name==='AbortError'?'Square recovery timed out. No new charge was made.':'Could not recover payment: '+error.message}
+        finally{clearTimeout(timeout);recover.disabled=false}
+      });
+      form.append(recover,recoveryMessage);
       const sandboxButton=button('Create sandbox test checkout',async()=>{
         const amountCents=Math.round(Number(sum.value)*100);
         if(!customer.value.trim()||!Number.isSafeInteger(amountCents)||amountCents<100){feedback.textContent='Enter customer name and test amount first.';return}
