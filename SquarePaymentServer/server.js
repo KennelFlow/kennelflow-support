@@ -89,7 +89,7 @@ function cors(req,res,next){
 }
 app.use(cors);
 
-app.get('/health', (_, res) => res.json({ ok: true, environment: isProduction ? 'production' : 'sandbox', storeCheckout: true, quailFlowStoreCheckout: quailFlowSalesEnabled, yardPatrolCheckout: true }));
+app.get('/health', (_, res) => res.json({ ok: true, environment: isProduction ? 'production' : 'sandbox', storeCheckout: true, quailFlowStoreCheckout: quailFlowSalesEnabled, yardPatrolCheckout: true, webhookConfigured: Boolean(process.env.SQUARE_WEBHOOK_SIGNATURE_KEY), cloudConfigured: cloudReady() }));
 app.get('/square/config', (_, res) => res.json({ environment: isProduction ? 'production' : 'sandbox', locationIDConfigured: Boolean(configuredLocationID), maxPaymentCents }));
 
 installKennelFlowOrderNotificationRoutes(app,{
