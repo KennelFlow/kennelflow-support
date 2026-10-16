@@ -2387,6 +2387,456 @@ export const models = {
     }
   ]
 };
+// Build 113 device-only native record shapes; optional fields keep old records readable.
+Object.assign(models, {
+  "KFMaintenanceEntry": [
+    {
+      "key": "kennelID",
+      "type": "UUID",
+      "optional": false
+    },
+    {
+      "key": "id",
+      "type": "UUID",
+      "optional": false,
+      "default": "$uuid"
+    },
+    {
+      "key": "date",
+      "type": "Date",
+      "optional": false,
+      "default": "$now"
+    },
+    {
+      "key": "status",
+      "type": "String",
+      "optional": false,
+      "default": "Repair"
+    },
+    {
+      "key": "notes",
+      "type": "String",
+      "optional": false,
+      "default": ""
+    },
+    {
+      "key": "inspection",
+      "type": "String",
+      "optional": false,
+      "default": "Not Inspected"
+    },
+    {
+      "key": "attachments",
+      "type": "[String]",
+      "optional": true
+    },
+    {
+      "key": "dueDate",
+      "type": "Date",
+      "optional": true
+    },
+    {
+      "key": "assignedStaffID",
+      "type": "UUID",
+      "optional": true
+    },
+    {
+      "key": "assignedStaffName",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "completed",
+      "type": "Bool",
+      "optional": true
+    },
+    {
+      "key": "completedAt",
+      "type": "Date",
+      "optional": true
+    },
+    {
+      "key": "recurrence",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "reminderEnabled",
+      "type": "Bool",
+      "optional": true
+    },
+    {
+      "key": "partsCents",
+      "type": "Int64",
+      "optional": true
+    },
+    {
+      "key": "laborCents",
+      "type": "Int64",
+      "optional": true
+    },
+    {
+      "key": "currencyCode",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "nextOccurrenceID",
+      "type": "UUID",
+      "optional": true
+    }
+  ],
+  "OFAXRayRecord": [
+    {
+      "key": "id",
+      "type": "UUID",
+      "optional": false,
+      "default": "$uuid"
+    },
+    {
+      "key": "dogID",
+      "type": "UUID",
+      "optional": true
+    },
+    {
+      "key": "subjectName",
+      "type": "String",
+      "optional": false
+    },
+    {
+      "key": "recordType",
+      "type": "String",
+      "optional": false,
+      "default": "OFA"
+    },
+    {
+      "key": "testName",
+      "type": "String",
+      "optional": false,
+      "default": "Hips"
+    },
+    {
+      "key": "date",
+      "type": "Date",
+      "optional": false,
+      "default": "$now"
+    },
+    {
+      "key": "result",
+      "type": "String",
+      "optional": false,
+      "default": ""
+    },
+    {
+      "key": "certificateNumber",
+      "type": "String",
+      "optional": false,
+      "default": ""
+    },
+    {
+      "key": "clinicOrLab",
+      "type": "String",
+      "optional": false,
+      "default": ""
+    },
+    {
+      "key": "notes",
+      "type": "String",
+      "optional": false,
+      "default": ""
+    }
+  ],
+  "VeterinaryClinicRecord": [
+    {
+      "key": "id",
+      "type": "UUID",
+      "optional": false,
+      "default": "$uuid"
+    },
+    {
+      "key": "name",
+      "type": "String",
+      "optional": false
+    },
+    {
+      "key": "veterinarian",
+      "type": "String",
+      "optional": false,
+      "default": ""
+    },
+    {
+      "key": "phone",
+      "type": "String",
+      "optional": false,
+      "default": ""
+    },
+    {
+      "key": "email",
+      "type": "String",
+      "optional": false,
+      "default": ""
+    },
+    {
+      "key": "address",
+      "type": "String",
+      "optional": false,
+      "default": ""
+    },
+    {
+      "key": "emergency",
+      "type": "Bool",
+      "optional": false,
+      "default": false
+    },
+    {
+      "key": "notes",
+      "type": "String",
+      "optional": false,
+      "default": ""
+    }
+  ],
+  "VeterinaryServiceRecord": [
+    {
+      "key": "id",
+      "type": "UUID",
+      "optional": false,
+      "default": "$uuid"
+    },
+    {
+      "key": "subjectName",
+      "type": "String",
+      "optional": false
+    },
+    {
+      "key": "clinicName",
+      "type": "String",
+      "optional": false,
+      "default": ""
+    },
+    {
+      "key": "service",
+      "type": "String",
+      "optional": false
+    },
+    {
+      "key": "date",
+      "type": "Date",
+      "optional": false,
+      "default": "$now"
+    },
+    {
+      "key": "cost",
+      "type": "Double",
+      "optional": false,
+      "default": 0
+    },
+    {
+      "key": "followUpDate",
+      "type": "Date",
+      "optional": true
+    },
+    {
+      "key": "notes",
+      "type": "String",
+      "optional": false,
+      "default": ""
+    }
+  ],
+  "EmployeeProfileRecord": [
+    {
+      "key": "id",
+      "type": "UUID",
+      "optional": false,
+      "default": "$uuid"
+    },
+    {
+      "key": "staffID",
+      "type": "UUID",
+      "optional": true
+    },
+    {
+      "key": "displayName",
+      "type": "String",
+      "optional": false
+    },
+    {
+      "key": "phone",
+      "type": "String",
+      "optional": false,
+      "default": ""
+    },
+    {
+      "key": "jobTitle",
+      "type": "String",
+      "optional": false,
+      "default": ""
+    },
+    {
+      "key": "emergencyContact",
+      "type": "String",
+      "optional": false,
+      "default": ""
+    },
+    {
+      "key": "emergencyPhone",
+      "type": "String",
+      "optional": false,
+      "default": ""
+    },
+    {
+      "key": "hireDate",
+      "type": "Date",
+      "optional": false,
+      "default": "$now"
+    },
+    {
+      "key": "notes",
+      "type": "String",
+      "optional": false,
+      "default": ""
+    }
+  ],
+  "KennelMessageRecord": [
+    {
+      "key": "id",
+      "type": "UUID",
+      "optional": false,
+      "default": "$uuid"
+    },
+    {
+      "key": "recipientName",
+      "type": "String",
+      "optional": false
+    },
+    {
+      "key": "recipientPhone",
+      "type": "String",
+      "optional": false
+    },
+    {
+      "key": "body",
+      "type": "String",
+      "optional": false
+    },
+    {
+      "key": "sentAt",
+      "type": "Date",
+      "optional": false,
+      "default": "$now"
+    },
+    {
+      "key": "recipientType",
+      "type": "String",
+      "optional": false,
+      "default": "Client"
+    }
+  ],
+  "EmployeeLocationRecord": [
+    {
+      "key": "id",
+      "type": "UUID",
+      "optional": false,
+      "default": "$uuid"
+    },
+    {
+      "key": "staffID",
+      "type": "UUID",
+      "optional": true
+    },
+    {
+      "key": "staffName",
+      "type": "String",
+      "optional": false
+    },
+    {
+      "key": "latitude",
+      "type": "Double",
+      "optional": false
+    },
+    {
+      "key": "longitude",
+      "type": "Double",
+      "optional": false
+    },
+    {
+      "key": "timestamp",
+      "type": "Date",
+      "optional": false,
+      "default": "$now"
+    }
+  ],
+  "PedigreeAncestorRecord": [
+    {
+      "key": "id",
+      "type": "UUID",
+      "optional": false,
+      "default": "$uuid"
+    },
+    {
+      "key": "subjectName",
+      "type": "String",
+      "optional": false
+    },
+    {
+      "key": "generation",
+      "type": "Int",
+      "optional": false
+    },
+    {
+      "key": "position",
+      "type": "Int",
+      "optional": false
+    },
+    {
+      "key": "name",
+      "type": "String",
+      "optional": false
+    },
+    {
+      "key": "registrationNumber",
+      "type": "String",
+      "optional": false,
+      "default": ""
+    },
+    {
+      "key": "titles",
+      "type": "String",
+      "optional": false,
+      "default": ""
+    },
+    {
+      "key": "notes",
+      "type": "String",
+      "optional": false,
+      "default": ""
+    }
+  ],
+  "PedigreeScanRecord": [
+    {
+      "key": "id",
+      "type": "UUID",
+      "optional": false,
+      "default": "$uuid"
+    },
+    {
+      "key": "subjectName",
+      "type": "String",
+      "optional": false
+    },
+    {
+      "key": "createdAt",
+      "type": "Date",
+      "optional": false,
+      "default": "$now"
+    },
+    {
+      "key": "recognizedText",
+      "type": "String",
+      "optional": false,
+      "default": ""
+    }
+  ]
+});
 export const collections = {
   "dogs": "Dog",
   "litters": "Litter",
@@ -2424,5 +2874,14 @@ export const collections = {
   "travelManifests": "KFTravelManifest",
   "inventoryScans": "KFInventoryScan",
   "inventoryReports": "KFInventoryReport",
-  "smartPlacements": "KFSmartPlacement"
+  "smartPlacements": "KFSmartPlacement",
+  "maintenanceRecords": "KFMaintenanceEntry",
+  "ofaXrays": "OFAXRayRecord",
+  "clinics": "VeterinaryClinicRecord",
+  "vetServices": "VeterinaryServiceRecord",
+  "employeeProfiles": "EmployeeProfileRecord",
+  "messages": "KennelMessageRecord",
+  "locations": "EmployeeLocationRecord",
+  "pedigreeAncestors": "PedigreeAncestorRecord",
+  "pedigreeScans": "PedigreeScanRecord"
 };

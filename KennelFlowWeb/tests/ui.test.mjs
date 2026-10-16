@@ -36,7 +36,7 @@ test('all forms, save, cross-device merge and session-expiry draft preservation'
         $('collection').value=option.value;$('collection').dispatchEvent(new window.Event('change'));$('add').click();assert.ok($('editor').open,option.value);assert.ok($('fields').children.length>0,option.value);assert.ok($('fields').querySelector('input,select,textarea'),option.value);$('cancelEditor').click();checked++;
       }
     }
-    assert.equal(new Set(Object.keys(data)).size,37);assert.equal(checked,38);
+    assert.equal(new Set(Object.keys(data)).size,46);assert.equal(checked,47);
     clickText($('nav'),'Dogs');clickText($('list'),'Edit');
     const original=rows.get(data.dogs.id);input($('fields').querySelector('[data-field="notes"]'),'Browser notes');
     rows.set(original.id,{...structuredClone(original),revision:2,data:{...original.data,record:{...original.data.record,name:'Native renamed dog'}}});
