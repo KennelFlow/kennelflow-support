@@ -131,7 +131,25 @@ function renderSpecialized(type,list){
     const live=list.filter(r=>!r.deleted_at),amount=key=>live.reduce((total,r)=>total+(Number(r.record?.[key])||0),0);
     const panel=el('section',undefined,'specialized-panel');
     panel.append(el('h3','Payment ledger'),el('p','These are saved payment records, not live Square transactions. To charge a card, use the authorized payment flow in the app.','muted'));
-    panel.append(el('p',live.length+' payment records · Recorded total: '+new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(amount('amount')),'muted'));host.append(panel);
+    panel.append(el('p',live.length+' payment records · Recorded total: '+new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(amount('amount')),'muted'));
+    if(['owner','admin'].includes(role)){
+      const form=el('form',undefined,'employee-form');
+      const customer=el('input'),sum=el('input'),detail=el('input'),reference=el('input'),submit=el('button','Create secure Square checkout'),feedback=el('p');
+      customer.placeholder='Customer name';customer.required=true;sum.type='number';sum.step='0.01';sum.min='1';sum.placeholder='Amount (USD)';sum.required=true;
+      detail.placeholder='Payment description';reference.placeholder='Invoice reference (optional)';
+      for(const [title,input] of [['Customer',customer],['Amount USD',sum],['Description',detail],['Reference',reference]]){const label=el('label',title);label.append(input);form.append(label)}
+      form.append(submit);form.addEventListener('submit',async event=>{
+        event.preventDefault();const amountCents=Math.round(Number(sum.value)*100);
+        if(!Number.isSafeInteger(amountCents)||amountCents<100){feedback.textContent='Enter a valid amount.';return}
+        submit.disabled=true;feedback.textContent='Requesting checkout securely…';
+        try{const data=await api('kennels/'+kennel+'/square-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amountCents,customerName:customer.value,description:detail.value,reference:reference.value})});
+          feedback.replaceChildren(el('span','Checkout link created. Payment is not yet confirmed. Share this link with the customer: '));
+          const anchor=el('a','Open Square checkout');anchor.href=data.url;anchor.target='_blank';anchor.rel='noopener noreferrer';feedback.append(anchor);
+        }catch(e){feedback.textContent=e.message}finally{submit.disabled=false}
+      });
+      panel.append(el('h3','Request payment with Square'),form,feedback);
+    }
+    host.append(panel);
   }
   if(type==='kennels'||type==='equipment'){
     const panel=el('section',undefined,'specialized-panel');
