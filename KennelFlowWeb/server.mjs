@@ -127,34 +127,35 @@ export function createWebServer({backend=BACKEND,fetcher=fetch,secure=process.en
       if(!/^https:\/\//.test(data.url||''))throw fail(502,'Invalid checkout URL');
       return send(res,200,{url:data.url,orderID:data.orderID||'',status:'AWAITING_CUSTOMER_PAYMENT'});
     }
-    const paymentStatus=/^\/api\/kennels\/([^/]+)\/square-(sandbox-)?status$/.exec(path);
+    const paymentStatus=/^\/api\/kennels\/([^/]+)\/square-(sandbox-)?(status|recover)$/.exec(path);
     if(paymentStatus&&req.method==='POST'){
       const scope=paymentStatus[1].toLowerCase();
       if(!uuid(scope))throw fail(400,'Invalid kennel');
       const member=await membership(s.token,scope);
       if(!['owner','admin'].includes(member.role))throw fail(403,'Only owner/admin may verify payments');
-      const {orderID,amountCents,customerName}=await json(req,16384);
+      const {orderID,amountCents,customerName,reference}=await json(req,16384);
       const inputRecord=typeof customerName==='string'&&customerName.trim()&&customerName.length<=120?{customerName:customerName.trim()}:null;
-      if(typeof orderID!=='string'||!orderID||orderID.length>192||!Number.isSafeInteger(amountCents)||amountCents<100)throw fail(400,'Invalid payment lookup');
+      if(!Number.isSafeInteger(amountCents)||amountCents<100|| (paymentStatus[3]==='status'?(typeof orderID!=='string'||!orderID||orderID.length>192):(typeof reference!=='string'||!reference.trim()||reference.length>120)))throw fail(400,'Invalid payment lookup');
       const secret=process.env.KENNELFLOW_CHECKOUT_SECRET;
       if(!secret||secret.length<32)throw fail(503,'Payment verification not configured');
-      const body=JSON.stringify({orderID,amountCents});
+      const body=JSON.stringify(paymentStatus[3]==='recover'?{kennelID:scope,reference:reference.trim(),amountCents}:{orderID,amountCents});
       const stamp=String(Date.now()),signature=createHmac('sha256',secret).update(stamp+'.'+body).digest('hex');
       const dest=paymentStatus[2]?'https://kennelflow-square-sandbox.onrender.com':'https://kennelflow-payments.onrender.com';
-      const result=await fetcher(dest+'/kennelflow/checkout-status',{method:'POST',headers:{'Content-Type':'application/json','X-KF-Timestamp':stamp,'X-KF-Signature':signature},body,redirect:'manual',signal:AbortSignal.timeout(20000)});
+      const result=await fetcher(dest+(paymentStatus[3]==='recover'?'/kennelflow/recover-payment':'/kennelflow/checkout-status'),{method:'POST',headers:{'Content-Type':'application/json','X-KF-Timestamp':stamp,'X-KF-Signature':signature},body,redirect:'manual',signal:AbortSignal.timeout(20000)});
       if(result.status>=300&&result.status<400)throw fail(502,'Payment redirect blocked');
       const data=await result.json().catch(()=>({error:'Invalid response'}));
       if(!result.ok)return send(res,result.status,{error:data.error||'Payment verification failed'});
+      const verifiedOrderID=data.orderID||orderID;
       if(data.paid===true&&typeof data.paymentID==='string'&&data.paymentID&&inputRecord){
         // Never record a sandbox transaction as real revenue. Test records carry an explicit method.
         const recordID=createHash('sha256').update('kf-square-'+(paymentStatus[2]?'sandbox':'production')+'-'+data.paymentID).digest('hex');
         const identifier=[recordID.slice(0,8),recordID.slice(8,12),'4'+recordID.slice(13,16),'a'+recordID.slice(17,20),recordID.slice(20,32)].join('-');
         const method=paymentStatus[2]?'Square Sandbox — TEST ONLY':'Square';
-        const record={id:identifier,customerName:inputRecord.customerName,puppyName:'',date:new Date().toISOString(),amount:amountCents/100,method,reference:data.paymentID,notes:'Verified Square order '+orderID+(paymentStatus[2]?' — SANDBOX TEST — NO REAL MONEY':'')};
+        const record={id:identifier,customerName:inputRecord.customerName,puppyName:'',date:new Date().toISOString(),amount:amountCents/100,method,reference:data.paymentID,notes:'Verified Square order '+verifiedOrderID+(paymentStatus[2]?' — SANDBOX TEST — NO REAL MONEY':'')};
         const error=validateModel(collections.payments,record);
         if(error)throw fail(400,error);
         const saved=await upstream('/v2/kennels/'+scope+'/records/'+identifier,s.token,'PUT',{type:'payments',expectedRevision:0,data:{platform:'ios',collection:'payments',record}});
-        if(saved.status===409)return send(res,409,{paid:true,status:'COMPLETED',orderID,paymentID:data.paymentID,environment:paymentStatus[2]?'sandbox':'production',saved:false,error:'Square confirmed payment, but KennelFlow could not verify whether the cloud record already exists. No duplicate record was created.'});
+        if(saved.status===409)return send(res,409,{paid:true,status:'COMPLETED',orderID:verifiedOrderID,paymentID:data.paymentID,environment:paymentStatus[2]?'sandbox':'production',saved:false,error:'Square confirmed payment, but KennelFlow could not verify whether the cloud record already exists. No duplicate record was created.'});
         if(saved.status!==200&&saved.status!==201)return send(res,502,{paid:true,error:'Square confirmed payment, but KennelFlow could not save the record'});
         return send(res,200,{paid:true,status:'COMPLETED',orderID,paymentID:data.paymentID,environment:paymentStatus[2]?'sandbox':'production',saved:true,alreadyRecorded:false});
       }
