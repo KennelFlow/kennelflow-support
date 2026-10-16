@@ -181,7 +181,20 @@ function renderSpecialized(type,list){
           cloudList.replaceChildren();
           if(!entries.length){cloudList.append(el('p','No cloud checkouts have been created yet.','muted'));return}
           for(const entry of entries){
-            const row=el('p',entry.customer_name+' — '+money(entry.amount_cents/100)+' — '+entry.status+' — '+(entry.reference||'no reference'));
+            const row=el('div',undefined,'record-card');
+            row.append(el('p',entry.customer_name+' — '+money(entry.amount_cents/100)+' — '+entry.status+' — '+(entry.reference||'no reference')));
+            if(entry.checkout_url&&entry.status==='PENDING'){
+              const link=el('a','Open checkout');link.href=entry.checkout_url;link.target='_self';link.rel='noopener noreferrer';row.append(link);
+              const message=el('p','');
+              const check=button('Check cloud payment',async()=>{
+                check.disabled=true;message.textContent='Checking Square…';
+                try{
+                  const r=await api('kennels/'+kennel+'/square-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderID:entry.order_id,amountCents:entry.amount_cents,customerName:entry.customer_name})});
+                  message.textContent=r.paid?'Square confirms payment. Refresh to update records.':'Still unpaid: '+(r.status||'pending');
+                  if(r.saved)await load(true);
+                }catch(e){message.textContent='Could not check: '+e.message}finally{check.disabled=false}
+              });row.append(check,message);
+            }
             cloudList.append(row);
           }
         }catch(error){cloudList.textContent='Cloud checkout history unavailable: '+error.message}
