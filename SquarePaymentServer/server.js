@@ -107,6 +107,34 @@ app.post('/kennelflow/checkout', async (req,res)=>{
     return res.json({url,orderID:data.payment_link.order_id||'',status:'AWAITING_CUSTOMER_PAYMENT'});
   }catch(e){return res.status(502).json({error:'Unable to create checkout'})}
 });
+app.post('/kennelflow/checkout-status',async(req,res)=>{
+  try{
+    const secret=process.env.KENNELFLOW_CHECKOUT_SECRET;
+    const stamp=req.header('X-KF-Timestamp')||'',sig=req.header('X-KF-Signature')||'';
+    if(!secret||secret.length<32)return res.status(503).json({error:'Secure verification unavailable'});
+    if(!/^\\d{13}$/.test(stamp)||Math.abs(Date.now()-Number(stamp))>120000||!/^[a-f0-9]{64}$/.test(sig))return res.status(403).json({error:'Unauthorized'});
+    const expected=crypto.createHmac('sha256',secret).update(stamp+'.'+JSON.stringify(req.body)).digest('hex');
+    if(!crypto.timingSafeEqual(Buffer.from(sig,'hex'),Buffer.from(expected,'hex')))return res.status(403).json({error:'Unauthorized'});
+    const {orderID,amountCents}=req.body||{};
+    if(typeof orderID!=='string'||!orderID||orderID.length>192||!Number.isSafeInteger(amountCents)||amountCents<100)return res.status(400).json({error:'Invalid order details'});
+    const headers={Authorization:'Bearer '+accessToken,'Square-Version':squareApiVersion};
+    const orderRes=await fetch(squareApiBase+'/v2/orders/'+encodeURIComponent(orderID),{headers});
+    const orderData=await orderRes.json();
+    if(!orderRes.ok)return res.status(502).json({error:'Could not verify Square order'});
+    const order=orderData?.order;
+    const valid=order?.location_id===configuredLocationID&&Number(order?.total_money?.amount)===amountCents&&Array.isArray(order?.line_items)&&order.line_items.some(x=>x.name==='KennelFlow service payment');
+    if(!valid)return res.status(409).json({error:'Square order details do not match'});
+    const ids=(order.tenders||[]).map(x=>x.payment_id).filter(Boolean);
+    let paid=false,paymentID='';
+    for(const id of ids){
+      const response=await fetch(squareApiBase+'/v2/payments/'+encodeURIComponent(id),{headers});
+      if(!response.ok)continue;
+      const payment=(await response.json()).payment;
+      if(payment?.status==='COMPLETED'&&payment?.order_id===orderID&&payment?.location_id===configuredLocationID&&Number(payment?.amount_money?.amount)===amountCents){paid=true;paymentID=id;break}
+    }
+    return res.json({paid,paymentID,orderID,status:paid?'COMPLETED':String(order?.state||'PENDING'),environment:isProduction?'production':'sandbox'});
+  }catch{return res.status(502).json({error:'Square payment verification failed'})}
+});
 app.post('/square/create-payment', async (req, res) => {
   try {
     const { sourceID, locationID, amountCents, currency='USD', customerName='', description='', idempotencyKey:clientIdempotencyKey='' } = req.body ?? {};
