@@ -211,6 +211,26 @@ $('reauthCancel').addEventListener('click',()=>$('reauth').close());
 $('logout').addEventListener('click',async()=>{if(!closeEditor())return;try{await api('logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})}finally{loadSequence++;employees.reset();teamMembers=[];rows.clear();identity=null;kennel='';role='';$('workspace').hidden=true;$('login').hidden=false;$('overview').replaceChildren();$('list').replaceChildren();message();setConnection('Signed out')}});
 $('kennel').addEventListener('change',async()=>{if(!closeEditor()){$('kennel').value=kennel;return}employees.reset();teamMembers=[];kennel=$('kennel').value;rows.clear();role='';render();await load()});
 $('refresh').addEventListener('click',()=>load());$('add').addEventListener('click',()=>openEditor());$('collection').addEventListener('change',()=>{selectedDay='';renderList()});$('search').addEventListener('input',renderList);$('deleted').addEventListener('change',renderList);$('recordForm').addEventListener('submit',save);$('closeEditor').addEventListener('click',()=>closeEditor());$('cancelEditor').addEventListener('click',()=>closeEditor());$('editor').addEventListener('cancel',e=>{e.preventDefault();if(!saving)closeEditor()});$('upload').addEventListener('change',dirty);$('print').addEventListener('click',()=>{document.querySelectorAll('#list details').forEach(d=>d.open=true);window.print()});
+
+// Export the currently filtered record list without including deleted records unless requested.
+// Prefix formula-like cell values so spreadsheet applications never execute cloud-supplied text.
+function exportVisibleRecords(){
+  const type=chosen(),term=$('search').value.trim().toLowerCase(),deleted=$('deleted').checked;
+  const selected=[...rows.values()].filter(r=>r.type===type&&(deleted?!!r.deleted_at:!r.deleted_at)&&(!term||JSON.stringify(r.record).toLowerCase().includes(term))&&(type!=='calendarEvents'||!selectedDay||localDay(r.record?.startDate)===selectedDay));
+  const keys=[...new Set(selected.flatMap(r=>Object.keys(r.record||{})))];
+  const safe=value=>{
+    const string=value==null?'':typeof value==='object'?JSON.stringify(value):String(value);
+    const guarded=/^[\\t\\r\\n ]*[=+@-]/.test(string)?"'"+string:string;
+    return '"'+guarded.replace(/"/g,'""')+'"';
+  };
+  const lines=[['recordType','revision','deletedAt',...keys].map(safe).join(','),...selected.map(r=>[r.type,r.revision,r.deleted_at||'',...keys.map(k=>r.record?.[k])].map(safe).join(','))];
+  const blob=new Blob(['\\ufeff'+lines.join('\\r\\n')],{type:'text/csv;charset=utf-8'});
+  const href=URL.createObjectURL(blob),link=el('a');link.href=href;link.download='kennelflow-'+type+(deleted?'-deleted':'')+'-'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(href),10000);
+}
+const exportButton=button('Export CSV',exportVisibleRecords,'secondary');
+$('print').insertAdjacentElement('afterend',exportButton);
+
 window.addEventListener('beforeunload',e=>{if(editor?.dirty){e.preventDefault();e.returnValue=''}});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&identity&&!loading&&!saving)load(true)});
 setInterval(()=>{if(!document.hidden&&identity&&!loading&&!saving&&!$('reauth').open)load(true)},15000);
