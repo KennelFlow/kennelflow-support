@@ -142,7 +142,7 @@ function renderSpecialized(type,list){
     const paymentSummary=el('p',live.length+' payment records · Recorded total: '+new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(amount('amount')),'muted');paymentSummary.dataset.paymentSummary='true';panel.append(paymentSummary);
     if(['owner','admin'].includes(role)){
       const form=el('form',undefined,'employee-form');
-      const customer=el('input'),sum=el('input'),detail=el('input'),reference=el('input'),submit=el('button','Create secure Square checkout'),feedback=el('p');
+      const customer=el('input'),sum=el('input'),detail=el('input'),reference=el('input'),submit=el('button','LIVE Square checkout — real payments'),feedback=el('p');
       customer.placeholder='Customer name';customer.required=true;sum.type='number';sum.step='0.01';sum.min='1';sum.placeholder='Amount (USD)';sum.required=true;
       detail.placeholder='Payment description';reference.placeholder='Invoice reference (optional)';
       for(const [title,input] of [['Customer',customer],['Amount USD',sum],['Description',detail],['Reference',reference]]){const label=el('label',title);label.append(input);form.append(label)}
@@ -153,7 +153,7 @@ function renderSpecialized(type,list){
         try{const data=await api('kennels/'+kennel+'/square-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amountCents,customerName:customer.value,description:detail.value,reference:reference.value})});
           feedback.replaceChildren(el('span','Checkout link created. Payment is not yet confirmed. Share this link with the customer: '));
           const anchor=el('a','Open Square checkout');anchor.href=data.url;anchor.target='_blank';anchor.rel='noopener noreferrer';feedback.append(anchor);
-        }catch(e){feedback.textContent=e.message}finally{submit.disabled=false}
+        }catch(e){feedback.textContent='LIVE Square payments error: '+e.message+'. This is separate from sandbox testing.'}finally{submit.disabled=false}
       });
       const sandboxButton=button('Create sandbox test checkout',async()=>{
         const amountCents=Math.round(Number(sum.value)*100);
@@ -189,7 +189,7 @@ function renderSpecialized(type,list){
           });feedback.append(check,verifyResult);
         }catch(e){feedback.textContent=e.message}finally{sandboxButton.disabled=false}
       },'secondary');
-      panel.append(el('h3','Request payment with Square'),form,sandboxButton,feedback);
+      panel.append(el('h3','Request payment with Square'),el('p','LIVE checkout charges real payment methods. SANDBOX checkout is for testing only.'),form,sandboxButton,feedback);
     }
     host.append(panel);
   }
