@@ -161,11 +161,21 @@ app.post('/kennelflow/checkout-status',async(req,res)=>{
     const {orderID,amountCents}=req.body||{};
     if(typeof orderID!=='string'||!orderID||orderID.length>192||!Number.isSafeInteger(amountCents)||amountCents<100)return res.status(400).json({error:'Invalid order details'});
     const headers={Authorization:'Bearer '+accessToken,'Square-Version':squareApiVersion};
+    let verifiedLocationID=configuredLocationID;
+    if(!isProduction){
+      const locationsRes=await fetch(squareApiBase+'/v2/locations',{headers});
+      const locationsData=await locationsRes.json();
+      if(!locationsRes.ok)return res.status(502).json({error:'Could not verify sandbox location'});
+      const active=(locationsData.locations||[]).filter(location=>location.status==='ACTIVE'&&location.id);
+      if(active.some(location=>location.id===verifiedLocationID))verifiedLocationID=configuredLocationID;
+      else if(active.length===1)verifiedLocationID=active[0].id;
+      else return res.status(409).json({error:'Sandbox location is ambiguous'});
+    }
     const orderRes=await fetch(squareApiBase+'/v2/orders/'+encodeURIComponent(orderID),{headers});
     const orderData=await orderRes.json();
     if(!orderRes.ok)return res.status(502).json({error:'Could not verify Square order'});
     const order=orderData?.order;
-    const valid=order?.location_id===configuredLocationID&&Number(order?.total_money?.amount)===amountCents&&Array.isArray(order?.line_items)&&order.line_items.some(x=>x.name==='KennelFlow service payment');
+    const valid=order?.location_id===verifiedLocationID&&Number(order?.total_money?.amount)===amountCents&&Array.isArray(order?.line_items)&&order.line_items.some(x=>x.name==='KennelFlow service payment');
     if(!valid)return res.status(409).json({error:'Square order details do not match'});
     const ids=(order.tenders||[]).map(x=>x.payment_id).filter(Boolean);
     let paid=false,paymentID='';
@@ -173,7 +183,7 @@ app.post('/kennelflow/checkout-status',async(req,res)=>{
       const response=await fetch(squareApiBase+'/v2/payments/'+encodeURIComponent(id),{headers});
       if(!response.ok)continue;
       const payment=(await response.json()).payment;
-      if(payment?.status==='COMPLETED'&&payment?.order_id===orderID&&payment?.location_id===configuredLocationID&&Number(payment?.amount_money?.amount)===amountCents){paid=true;paymentID=id;break}
+      if(payment?.status==='COMPLETED'&&payment?.order_id===orderID&&payment?.location_id===verifiedLocationID&&Number(payment?.amount_money?.amount)===amountCents){paid=true;paymentID=id;break}
     }
     return res.json({paid,paymentID,orderID,status:paid?'COMPLETED':String(order?.state||'PENDING'),environment:isProduction?'production':'sandbox'});
   }catch{return res.status(502).json({error:'Square payment verification failed'})}
