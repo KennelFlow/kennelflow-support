@@ -147,7 +147,21 @@ function renderSpecialized(type,list){
           const anchor=el('a','Open Square checkout');anchor.href=data.url;anchor.target='_blank';anchor.rel='noopener noreferrer';feedback.append(anchor);
         }catch(e){feedback.textContent=e.message}finally{submit.disabled=false}
       });
-      panel.append(el('h3','Request payment with Square'),form,feedback);
+      const sandboxButton=button('Create sandbox test checkout',async()=>{
+        const amountCents=Math.round(Number(sum.value)*100);
+        if(!customer.value.trim()||!Number.isSafeInteger(amountCents)||amountCents<100){feedback.textContent='Enter customer name and test amount first.';return}
+        sandboxButton.disabled=true;
+        try{const data=await api('kennels/'+kennel+'/square-sandbox-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amountCents,customerName:customer.value,description:detail.value,reference:reference.value})});
+          feedback.replaceChildren(el('strong','SANDBOX ONLY — no real money. '));
+          const link=el('a','Open test checkout');link.href=data.url;link.target='_blank';link.rel='noopener noreferrer';feedback.append(link);
+          const check=button('Verify Square test payment',async()=>{
+            try{const v=await api('kennels/'+kennel+'/square-sandbox-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderID:data.orderID,amountCents})});
+              message(v.paid?'Square confirmed sandbox payment COMPLETED (ID '+v.paymentID+').':'Square has not confirmed a completed payment. Status: '+v.status);
+            }catch(e){message(e.message)}
+          });feedback.append(check);
+        }catch(e){feedback.textContent=e.message}finally{sandboxButton.disabled=false}
+      },'secondary');
+      panel.append(el('h3','Request payment with Square'),form,sandboxButton,feedback);
     }
     host.append(panel);
   }
