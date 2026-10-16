@@ -127,6 +127,20 @@ export function createWebServer({backend=BACKEND,fetcher=fetch,secure=process.en
       if(!/^https:\/\//.test(data.url||''))throw fail(502,'Invalid checkout URL');
       return send(res,200,{url:data.url,orderID:data.orderID||'',status:'AWAITING_CUSTOMER_PAYMENT'});
     }
+    const pendingList=/^\\/api\\/kennels\\/([^/]+)\\/square-pending$/.exec(path);
+    if(pendingList&&req.method==='GET'){
+      const scope=pendingList[1].toLowerCase();
+      if(!uuid(scope))throw fail(400,'Invalid kennel');
+      const member=await membership(s.token,scope);
+      if(!['owner','admin'].includes(member.role))throw fail(403,'Only owner/admin may view checkouts');
+      const secret=process.env.KENNELFLOW_CHECKOUT_SECRET;
+      if(!secret||secret.length<32)throw fail(503,'Payment cloud listing not configured');
+      const body=JSON.stringify({kennelID:scope});
+      const stamp=String(Date.now()),signature=createHmac('sha256',secret).update(stamp+'.'+body).digest('hex');
+      const response=await fetcher('https://kennelflow-payments.onrender.com/kennelflow/pending-list',{method:'POST',headers:{'Content-Type':'application/json','X-KF-Timestamp':stamp,'X-KF-Signature':signature},body,signal:AbortSignal.timeout(20000)});
+      const result=await response.json().catch(()=>({error:'Invalid cloud checkout response'}));
+      return send(res,response.status,response.ok?{checkouts:result.checkouts||[]}:{error:result.error||'Cloud checkout lookup failed'});
+    }
     const paymentStatus=/^\/api\/kennels\/([^/]+)\/square-(sandbox-)?(status|recover)$/.exec(path);
     if(paymentStatus&&req.method==='POST'){
       const scope=paymentStatus[1].toLowerCase();
