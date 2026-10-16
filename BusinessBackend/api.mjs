@@ -2,6 +2,17 @@ import { randomBytes, randomUUID, createHash, scrypt, timingSafeEqual } from 'no
 import { promisify } from 'node:util';
 import { canManage, canRead, canWrite, validEmail, validPassword, validUUID, validateRecord, collections } from './policy.mjs';
 const derive=promisify(scrypt);
+export function normalizeBusinessWebsite(value) {
+ const raw=String(value||'').trim();
+ if(!raw)return '';
+ const candidate=/^[a-z][a-z0-9+.-]*:\/\//i.test(raw)?raw:'https://'+raw;
+ let url;
+ try { url=new URL(candidate); } catch { return null; }
+ if(url.protocol!=='https:' || url.username || url.password ||
+    !/^(?:[a-z0-9-]+\.)+[a-z]{2,}$/i.test(url.hostname) || url.hostname.length>253 ||
+    url.port || url.hash || /\s/.test(raw))return null;
+ return url.toString();
+}
 export const digest=value=>createHash('sha256').update(value).digest('hex');
 export async function hashPassword(password) { const salt=randomBytes(16).toString('hex');return salt+':'+(await derive(password,salt,64)).toString('hex'); }
 export async function verifyPassword(password,stored) {
@@ -71,6 +82,8 @@ export function createAPI(repo) { return { async fetch(request) {
    address:String(input.address||'').trim(),
    website:String(input.website||'').trim()
   };
+  profile.website=normalizeBusinessWebsite(profile.website);
+  if(profile.website===null)return response(400,{error:'Enter a valid website address (example: www.yourbusiness.com)'});
   if(!validUUID(kennel)||!validEmail(profile.email)||!validEmail(profile.expectedEmail)||
      !profile.ownerName||profile.ownerName.length>120||!profile.businessName||profile.businessName.length>120||
      profile.expectedBusinessName.length>120||profile.phone.length>40||profile.address.length>500||
