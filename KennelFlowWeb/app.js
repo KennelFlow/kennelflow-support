@@ -172,6 +172,27 @@ function renderSpecialized(type,list){
         }
       };
       pendingPanel.append(pendingHeading,pendingHelp,pendingItems);panel.append(pendingPanel);drawPending();
+      // Reconcile previously created requests when the owner opens Payments.
+      // Only server-verified completed transactions are saved as revenue.
+      const pendingNow=readPending().slice(0,8);
+      if(pendingNow.length){
+        const syncLabel=el('p','Checking saved pending requests with Square…','muted');
+        pendingPanel.append(syncLabel);
+        void (async()=>{
+          let completed=0,failed=0;
+          for(const entry of pendingNow){
+            try{
+              const result=await api('kennels/'+kennel+'/square-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderID:entry.orderID,amountCents:entry.amountCents,customerName:entry.customerName})});
+              if(result.saved||result.alreadyRecorded){
+                writePending(readPending().filter(x=>x.orderID!==entry.orderID));
+                completed++;
+              }
+            }catch{failed++}
+          }
+          syncLabel.textContent=completed?completed+' completed Square payment(s) reconciled. Refresh to see ledger updates.':failed?failed+' request(s) could not be checked; use Check payment to retry.':'Pending requests checked; no new completed payments.';
+          drawPending();
+        })();
+      }
       const form=el('form',undefined,'employee-form');
       const customer=el('input'),sum=el('input'),detail=el('input'),reference=el('input'),submit=el('button','LIVE Square checkout — real payments'),feedback=el('p');
       customer.placeholder='Customer name';customer.required=true;sum.type='number';sum.step='0.01';sum.min='1';sum.placeholder='Amount (USD)';sum.required=true;
