@@ -98,7 +98,7 @@ function renderList(){
     const card=el('article',undefined,'record'+(row.deleted_at?' deleted':'')),head=el('div',undefined,'record-head'),text=el('div'),actions=el('div',undefined,'actions');
     text.append(el('h3',recordName(row.record)),el('p',[row.record?.status,row.record?.category,row.record?.date||row.record?.startDate?new Date(row.record.date||row.record.startDate).toLocaleDateString():null].filter(Boolean).join(' · '),'muted'));
     if(canWrite(role,type)&&row.record){actions.append(button(row.deleted_at?'Restore':'Edit',()=>row.deleted_at?restore(row):openEditor(row)));if(!row.deleted_at)actions.append(button('Delete',()=>remove(row),'danger'))}
-    if(!row.deleted_at&&['documents','scannedReports'].includes(type)&&['owner','admin'].includes(role))actions.append(button('Download',()=>download(row)));
+    if(!row.deleted_at&&['documents','scannedReports'].includes(type)&&['owner','admin'].includes(role)){actions.append(button('Download',()=>download(row)));actions.append(button('Replace file',()=>replaceFile(row)));}
     if(!row.deleted_at&&type==='tasks'&&canWrite(role,type))actions.append(button(row.record.completed?'Reopen':'Complete',()=>toggleCompleted(row)));
     head.append(text,actions);card.append(head);
     const detail=el('details',undefined,'detail-block');detail.append(el('summary','View record details'));const dl=el('dl');
@@ -243,6 +243,25 @@ async function save(event){
 async function remove(row){if(!confirm(`Delete ${recordName(row.record)}? It will also be removed from connected apps. You can restore it from Show deleted.`))return;try{await write(row,row.record,isoDate(Date.now()));await load()}catch(e){message(e.status===409?'Another device changed this record. Refresh and review it before deleting.':e.message)}}
 async function restore(row){try{await write(row,row.record);await load()}catch(e){message(e.message)}}
 async function toggleCompleted(row){try{await write(row,{...row.record,completed:!row.record.completed});await load(true)}catch(e){message(e.message)}}
+async function replaceFile(row){
+  if(!['owner','admin'].includes(role)||!['documents','scannedReports'].includes(row.type))return;
+  const picker=el('input');picker.type='file';picker.accept='image/*,.pdf,.txt,.doc,.docx';
+  picker.addEventListener('change',async()=>{
+    const file=picker.files?.[0];if(!file)return;
+    if(file.size>10485760){message('File must be 10 MB or smaller.');return}
+    if(!confirm('Replace the cloud file for '+recordName(row.record)+'? The previous file will no longer be available.'))return;
+    const scope=kennel;
+    try{
+      const current=rows.get(row.id);
+      if(!current||current.revision!==row.revision){message('This record changed. Refresh and try again.');return}
+      const response=await fetch('/api/kennels/'+scope+'/files/'+row.id,{method:'PUT',credentials:'same-origin',body:file,headers:{'X-Requested-With':'KennelFlowWeb'}});
+      const detail=await response.json().catch(()=>({}));
+      if(!response.ok)throw Object.assign(Error(detail.error||'Upload failed'),{status:response.status});
+      message('Document file updated in cloud. The record metadata remains unchanged.');
+    }catch(e){message(e.message);if(e.status===401)requireLogin()}
+  });
+  picker.click();
+}
 async function download(row){try{const r=await fetch(`/api/kennels/${kennel}/files/${row.id}`,{credentials:'same-origin'});if(!r.ok){const data=await r.json();throw Error(data.error||'File is not uploaded yet')}const url=URL.createObjectURL(await r.blob()),a=el('a');a.href=url;a.download=row.record.fileName||row.id;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000)}catch(e){message(e.message)}}
 $('loginForm').addEventListener('submit',async e=>{e.preventDefault();$('loginButton').disabled=true;try{message();await api('login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value,password:$('password').value})});$('password').value='';await init()}catch(e){message(e.message)}finally{$('loginButton').disabled=false}});
 function requireLogin(){if(!$('reauth').open){$('reauthEmail').value=identity?.email||'';$('reauthError').textContent='';$('reauth').showModal()}}
