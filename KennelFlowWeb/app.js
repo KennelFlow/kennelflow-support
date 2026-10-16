@@ -172,6 +172,20 @@ function renderSpecialized(type,list){
         }
       };
       pendingPanel.append(pendingHeading,pendingHelp,pendingItems);panel.append(pendingPanel);drawPending();
+      const cloudHeading=el('h3','Cloud Square checkout history');
+      const cloudList=el('div');pendingPanel.append(cloudHeading,cloudList);
+      void (async()=>{
+        try{
+          const cloud=await api('kennels/'+kennel+'/square-pending');
+          const entries=cloud.checkouts||[];
+          cloudList.replaceChildren();
+          if(!entries.length){cloudList.append(el('p','No cloud checkouts have been created yet.','muted'));return}
+          for(const entry of entries){
+            const row=el('p',entry.customer_name+' — '+money(entry.amount_cents/100)+' — '+entry.status+' — '+(entry.reference||'no reference'));
+            cloudList.append(row);
+          }
+        }catch(error){cloudList.textContent='Cloud checkout history unavailable: '+error.message}
+      })();
       // Reconcile previously created requests when the owner opens Payments.
       // Only server-verified completed transactions are saved as revenue.
       const pendingNow=readPending().slice(0,8);
