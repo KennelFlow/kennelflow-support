@@ -141,3 +141,20 @@ User's October 16 screenshot of the Litters page showed that the shared app back
 - Public App Store release held while user tests updated background, Maintenance shortcut, saved repairs, purchase entitlements and smart kennel NFC mappings.
 
 No customer data, Square settings, CloudKit container IDs, product IDs, or live website settings changed.
+
+
+## Build 126 TestFlight acceptance evidence (October 17, 2026)
+
+- All **20 maintenance/legacy migration/QR tests passed**, zero failures, using the \`MaintenanceTests\` scheme.
+- Full iOS app compiled in simulator: \`** BUILD SUCCEEDED **\`.
+- Simulator iPhone 17 installed and launched \`com.kennelflow.app\`; visual screenshot showed **Kennel One** and its green K1 image on Dashboard. New shared wallpaper source uses this approved image, not baked-in \`KennelFlowLogoWallpaper\`.
+- Signed Apple Developer Team 2J9CBS9546 archive: \`** ARCHIVE SUCCEEDED **\`; app name Kennel One, bundle ID \`com.kennelflow.app\`, version 2.8, Build 126; \`codesign --verify --deep --strict\` passed.
+- \`xcodebuild\` App Store upload completed with **Upload succeeded** / **EXPORT SUCCEEDED** at approximately 12:03 AM Eastern on October 17.
+- App Store Connect TestFlight upload status **Complete**; build list status **Ready to Submit**, internal group **KennelFlow Beta Testers** with **2 internal testers**.
+- Added and verified after reload Build126 *What to Test* notes for Litters/other-screen wallpapers, top-of-More Maintenance, kennel Add/Edit/Delete, legacy repair history, NFC/QR mapping, account records and purchase access.
+- **Public App Store review NOT changed;** old 2.8 Build 123 remains on its own review submission. App Store name, domain, site and store cutover still pending.
+
+### Human verification remaining
+- Owner updates iPhone TestFlight from Build125 to **Build126** and visually confirms the Litters screen no longer displays KennelFlow wallpaper and that **More > Maintenance** is the first option and opens existing kennel records.
+- Retest customer login, subscription/lifetime access restoration, existing maintenance notes, QR and NFC smart kennel links on the owner's device.
+- Do not submit rebrand to public review until this acceptance is confirmed.
