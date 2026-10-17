@@ -32,3 +32,9 @@ test('public landing shows six genuine screenshot assets without missing links',
  assert.match(page,/loading="lazy"/);
  assert.match(read('deploy/kennelone-public/styles.css'),/screen-gallery/);
 });
+
+test('public website support link stays consistent with live Kennel One support email',()=>{
+ const site=read('deploy/kennelone-public/index.html');
+ assert.match(site,/mailto:kenneloneapp@gmail\.com/);
+ assert.doesNotMatch(site,/mailto:kennelflowapp@gmail\.com/);
+});
