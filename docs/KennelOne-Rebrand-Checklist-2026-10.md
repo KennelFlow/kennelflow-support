@@ -73,3 +73,14 @@ Never claim an App Store upload, domain purchase, production launch, or payment 
 2. Perform physical iPhone TestFlight tests: existing account retains dogs/kennels and other records; subscription and lifetime access restore correctly; scanning an existing printed QR code and programmed NFC tag resolves the correct saved kennel/dog; live cloud sync works; Square integration tested safely in sandbox.
 3. Confirm app name **Kennel One** is available/accepted in App Store Connect and required metadata, privacy policy, terms and support branding are accurate before submitting for public App Review.
 4. Do not change public domains or production payment callbacks until new domain is registered and DNS/HTTPS/redirect/Apple Pay checks have passed.
+
+
+## App Store Connect verified TestFlight status (October 16, 2026)
+
+- Connected to the real App Store Connect web interface and verified **iOS 2.8 (124)** is listed under TestFlight Builds, upload **Complete**, with build status **Ready to Submit**.
+- A failed/replaced upload record also appears, but a separate successful upload record is marked Complete; the Build 124 entry is selectable.
+- Build 124 has the **KennelFlow Beta Testers** *internal* group attached, containing two eligible testers.
+- The group member list independently shows the owner's internal tester account **Installed 2.8 (124)** on an iPhone 17 Pro Max. Another internal tester is currently **Installed 2.8 (123)**.
+- Added *What to Test* release notes to Build 124, instructing the team to check old customer records, subscription and lifetime purchase restoration, existing QR/NFC tags, cloud synchronization, and branding. Save confirmed; notes persist after a page reload.
+- The public App Store version **2.8 Build 123** remains **Waiting for Review** and was not altered. No public App Review submission of Build 124.
+- Outstanding: independent proof that the existing customer login retains its records, that subscription entitlements restore in the actual TestFlight install, that a physical NFC tag and printed QR open the correct existing dog/kennel on a physical iPhone, and that two-way cloud updates match the web portal. **Do not mark these done from TestFlight installation count or unit tests alone.**
