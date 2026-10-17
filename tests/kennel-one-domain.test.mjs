@@ -38,3 +38,27 @@ test('public website support link stays consistent with live Kennel One support 
  assert.match(site,/mailto:kenneloneapp@gmail\.com/);
  assert.doesNotMatch(site,/mailto:kennelflowapp@gmail\.com/);
 });
+
+
+test('new branded public paths safely hand off to current working sites',()=>{
+ const cases={
+   'shop.html':'https://kennelflowpro.app/shop.html',
+   'support.html':'https://kennelflowpro.app/support.html',
+   'checkout.html':'https://kennelflowpro.app/checkout.html',
+   'app.html':'https://app.kennelflowpro.app/',
+   'privacy.html':'https://kennelflowpro.app/privacy.html',
+   'terms.html':'https://kennelflowpro.app/terms.html',
+ };
+ for(const [path,destination] of Object.entries(cases)){
+   const html=read('deploy/kennelone-public/'+path);
+   assert.match(html,/<title>[^<]+Kennel One<\/title>/);
+   assert.ok(html.includes('window.location.replace('+JSON.stringify(destination).replaceAll('"',"'")+')'),path+' preserves working destination');
+   assert.ok(html.includes('href="'+destination+'"'),path+' includes accessible backup');
+   assert.doesNotMatch(html,/javascript:|https?:\/\/app\.kennelone\.app/);
+ }
+ const home=read('deploy/kennelone-public/index.html');
+ for(const path of ['/shop.html','/support.html','/privacy.html','/terms.html']){
+   assert.ok(home.includes('href="'+path+'"'),'landing links '+path);
+ }
+ assert.equal(read('deploy/kennelone-public/robots.txt'),'User-agent: *\nDisallow: /\n');
+});
