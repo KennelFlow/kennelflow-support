@@ -1,0 +1,6 @@
+Kennel One focused private-messaging backend PR:
+- Backend code previously prepared and tested in staging.
+- No production Neon Function deployment should be performed by merging this PR alone.
+- Migration 011 was already tested and added to production independently.
+- Existing production Neon Function adapter source must be verified before enabling route.
+- No website, Square checkout, customer records or app builds changed by this branch.
