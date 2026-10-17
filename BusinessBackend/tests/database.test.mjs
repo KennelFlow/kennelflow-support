@@ -9,7 +9,7 @@ async function as(user,fn){await db.exec('SET ROLE kennelflow_api');try{await db
 const payload=(id,staffID=staff)=>JSON.stringify({platform:'ios',collection:'kennelCareSessions',record:{id,staffID,staffName:'Employee'}});
 before(async()=>{
  db=await PGlite.create();await db.exec('CREATE ROLE kennelflow_api NOSUPERUSER NOBYPASSRLS');
- for(const name of ['001_kennelflow.sql','002_revision_sync.sql','003_security_hardening.sql','004_auth.sql','005_access_control.sql','006_password_reset.sql','007_business.sql','008_files.sql','009_employees.sql','010_business_profile.sql'])await db.exec(await readFile(new URL('../schema/'+name,import.meta.url),'utf8'));
+ for(const name of ['001_kennelflow.sql','002_revision_sync.sql','003_security_hardening.sql','004_auth.sql','005_access_control.sql','006_password_reset.sql','007_business.sql','008_files.sql','009_employees.sql','010_business_profile.sql','011_private_messages.sql'])await db.exec(await readFile(new URL('../schema/'+name,import.meta.url),'utf8'));
  await db.exec(`GRANT USAGE ON SCHEMA public TO kennelflow_api;
  GRANT SELECT ON kennels,kennel_memberships,app_users TO kennelflow_api;
  GRANT SELECT,INSERT,UPDATE ON kennel_records,kennel_attachments TO kennelflow_api;
@@ -117,4 +117,38 @@ test('owner profile edits are atomic, only owner can rename, and stale changes f
  assert.equal(k.name,'Updated Kennel');assert.equal(k.contact_phone,'304-555-0141');assert.equal(k.website,'https://example.org');
  await assert.rejects(as(owner,()=>db.query('SELECT business_update_profile($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',profile)),e=>e.code==='40001');
  assert.equal((await db.query('SELECT name FROM kennels WHERE id=$1',[kennel])).rows[0].name,'Updated Kennel');
+});
+
+
+test('private inbox requires a logged-in Business account membership',async()=>{
+ await assert.rejects(as(null,()=>db.query('SELECT business_private_inbox($1)',[kennel])),e=>e.code==='42501');
+ await assert.rejects(as(viewer,()=>db.query('SELECT business_private_inbox($1)',[kennel])),e=>e.code==='42501');
+ await assert.rejects(as(staff,()=>db.query('SELECT business_private_inbox($1)',[other])),e=>e.code==='42501');
+});
+test('private message creation verifies recipient and tenant on server',async()=>{
+ await assert.rejects(as(staff,()=>db.query('SELECT business_private_send($1,$2,$3,$4)',[kennel,uuid(82),'stranger@example.com','hello'])),e=>e.code==='42501');
+ await assert.rejects(as(staff,()=>db.query('SELECT business_private_send($1,$2,$3,$4)',[other,uuid(82),'admin@example.com','hello'])),e=>e.code==='42501');
+ await assert.rejects(as(viewer,()=>db.query('SELECT business_private_send($1,$2,$3,$4)',[kennel,uuid(82),'admin@example.com','hello'])),e=>e.code==='42501');
+ await assert.rejects(as(staff,()=>db.query('SELECT business_private_send($1,$2,$3,$4)',[kennel,uuid(82),'staff@example.com','self'])),e=>e.code==='42501');
+});
+test('verified sender can message an active colleague exactly once',async()=>{
+ const send=()=>as(staff,async()=>(await db.query('SELECT business_private_send($1,$2,$3,$4) AS data',[kennel,uuid(83),'admin@example.com','Care complete'])).rows[0].data);
+ const first=await send();assert.equal(first.senderID,staff);
+ assert.equal((await send()).id,uuid(83));
+ assert.equal((await db.query('SELECT count(*)::int AS n FROM business_private_messages')).rows[0].n,1);
+ await assert.rejects(as(staff,()=>db.query('SELECT business_private_send($1,$2,$3,$4)',[kennel,uuid(83),'admin@example.com','changed text'])),e=>e.code==='40001');
+});
+test('private inbox returns only sender and recipient messages, not other employees',async()=>{
+ const staffInbox=await as(staff,async()=>(await db.query('SELECT business_private_inbox($1) AS data',[kennel])).rows[0].data);
+ const adminInbox=await as(admin,async()=>(await db.query('SELECT business_private_inbox($1) AS data',[kennel])).rows[0].data);
+ const ownerInbox=await as(owner,async()=>(await db.query('SELECT business_private_inbox($1) AS data',[kennel])).rows[0].data);
+ assert.equal(staffInbox.length,1); assert.equal(adminInbox.length,1);assert.equal(ownerInbox.length,0);
+ assert.equal(staffInbox[0].body,'Care complete');
+ assert.equal(staffInbox[0].senderID,staff);
+ assert.equal(adminInbox[0].recipientID,admin);
+});
+test('private table grants stay denied even when message functions are usable',async()=>{
+ const r=await db.query("SELECT has_table_privilege('kennelflow_api','business_private_messages','SELECT') AS read_access,has_table_privilege('kennelflow_api','business_private_messages','INSERT') AS write_access");
+ assert.equal(r.rows[0].read_access,false);assert.equal(r.rows[0].write_access,false);
+ await assert.rejects(as(staff,()=>db.query('SELECT * FROM business_private_messages')),e=>e.code==='42501');
 });

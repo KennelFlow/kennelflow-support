@@ -40,6 +40,10 @@ export function createRepository(connectionString) {
    const r=await c.query('SELECT * FROM upsert_kennel_record($1,$2,$3,1,$4,$5::jsonb,$6)',[kennel,id,input.type,input.expectedRevision,JSON.stringify(input.data),input.deletedAt||null]);
    const row=r.rows[0];return {id:row.id,type:row.record_type,revision:Number(row.revision),data:row.payload,updated_at:row.updated_at,deleted_at:row.deleted_at};
   })},
+  async privateInbox(actor,kennel){return scoped(actor,kennel,async c=>
+    (await c.query('SELECT business_private_inbox($1) AS messages',[kennel])).rows[0].messages)},
+  async privateSend(actor,kennel,id,recipientEmail,message){return scoped(actor,kennel,async c=>
+    (await c.query('SELECT business_private_send($1,$2,$3,$4) AS message',[kennel,id,recipientEmail,message])).rows[0].message)},
   async file(actor,kennel,id){return scoped(actor,kennel,async c=>(await c.query('SELECT bytes,sha256 FROM business_files WHERE kennel_id=$1 AND record_id=$2',[kennel,id])).rows[0])},
   async putFile(actor,kennel,id,bytes,hash){return scoped(actor,kennel,async c=>{
    const existing=(await c.query('SELECT sha256 FROM business_files WHERE kennel_id=$1 AND record_id=$2',[kennel,id])).rows[0];

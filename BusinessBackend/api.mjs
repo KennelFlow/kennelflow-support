@@ -105,12 +105,23 @@ export function createAPI(repo) { return { async fetch(request) {
  }
  if(request.method==='POST'&&path==='/v2/logout'){await repo.logout(actor);return response(200,{ok:true})}
  if(request.method==='GET'&&path==='/v2/me')return response(200,{user:{id:actor.id,email:actor.email,name:actor.name},kennels:await repo.kennels(actor)});
- const match=/^\/v2\/kennels\/([a-f0-9-]{36})\/(members|invitations|records|files|history|clock)(?:\/([a-f0-9-]{36}))?$/.exec(path);
+ const match=/^\/v2\/kennels\/([a-f0-9-]{36})\/(members|invitations|records|files|history|clock|private-messages)(?:\/([a-f0-9-]{36}))?$/.exec(path);
  if(!match||!validUUID(match[1]))return response(404,{error:'Not found'});
  const kennel=match[1],resource=match[2],id=match[3];
  const membership=(await repo.kennels(actor)).find(k=>k.id===kennel);
  if(!membership)return response(403,{error:'Access denied'});
  const role=membership.role;
+ if(resource==='private-messages'&&!id&&['GET','POST'].includes(request.method)){
+  if(!['owner','admin','staff'].includes(role))return response(403,{error:'Access denied'});
+  if(request.method==='GET')return response(200,{messages:await repo.privateInbox(actor,kennel)});
+  const input=await body(request);
+  const messageID=String(input.id||'').toLowerCase();
+  const recipientEmail=String(input.recipientEmail||'').trim().toLowerCase();
+  const content=String(input.body||'').trim();
+  if(!validUUID(messageID)||!validEmail(recipientEmail)||content.length<1||content.length>4000)
+   return response(400,{error:'Provide a valid recipient and message up to 4000 characters'});
+  return response(201,{message:await repo.privateSend(actor,kennel,messageID,recipientEmail,content)});
+ }
  if(resource==='history'&&request.method==='GET'&&!id){
   const before=url.searchParams.get('before');if(before&&!/^[1-9][0-9]{0,17}$/.test(before))return response(400,{error:'Invalid history cursor'});
   const rows=await repo.history(actor,kennel,before||null),page=rows.slice(0,100);
