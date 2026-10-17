@@ -181,3 +181,13 @@ User rejected the previous Build 126 wallpaper because the enlarged boxed app ic
 - Apple's TestFlight processing status requires independent UI verification. **Do not claim the build is available to testers until the processing result appears and the internal group is attached.**
 - Preserve previous production app review submission, Apple subscriptions and lifetime access, all live customer records, NFC assignments, cloud sync, Square payments, website and existing domain.
 - Next: have the owner install Build127 in TestFlight, inspect the Litters screen for full centered K1 emblem, native KennelOne text, dark green gradient, and no white box; recheck Maintenance and NFC tag. Do not submit public App Review until accepted.
+
+
+## Build 127 Apple processing and TestFlight group verified
+
+- Apple App Store Connect upload history shows **2.8 (127) — Complete**, created October 17 2026 about 12:27 AM Eastern.
+- The TestFlight iOS builds list shows **Build 127 — Ready to Submit**, linked to the original **KennelFlow Beta Testers** internal group with two eligible testers. This is internal TestFlight readiness, **not** a public App Review status.
+- Added test notes specifying the approved high-contrast K1 logo (transparent emblem/no white box), centered KennelOne wordmark, Litters screen, readable live cards/navigation, original maintenance records, NFC and subscription entitlements; saved and verified persisted after reload.
+- Signed release verified: \`Kennel One 2.8 (127)\`, bundle ID \`com.kennelflow.app\`; Xcode \`ARCHIVE SUCCEEDED\`, upload \`EXPORT SUCCEEDED\`.
+- Screenshot from an iPhone 17 simulator launch inspected: Dashboard cards remain usable and old square logo border is gone. Human acceptance on the owner's real Litters screen and saved records still required.
+- **Do not submit Build 127 for public review or merge the staged website/domain rebrand until accepted.** Current public submission remains separate and untouched.
