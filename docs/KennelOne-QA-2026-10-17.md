@@ -11,11 +11,12 @@ This is an engineering verification log, not a claim of public release.
 - The iPad and iPhone simulator apps compiled and launched; iPhone screenshots identified two small-screen dashboard defects.
 - Source-only visual fix: make `Smart Kennel Scan` fit its card, remove a decorative chart behind the Expenses label. Rebuilt and verified on the iPhone simulator. This source-only fix was NOT present in the already submitted Build 128.
 - Production website, live management portal, and both production/Sandbox payment health URLs returned HTTP 200 over HTTPS in checks. Payment health reported configured webhook and cloud integration, which is readiness, not proof of an actual card charge.
+- Live portal returned 200 on /health and 401 on unauthenticated /api/me and /api/records, correctly denying anonymous account/record access.
 - Production and isolated test database branches were accessible read-only, each with 11 application tables.
 - Isolated test database contained 3 completed Sandbox checkouts and 3 `Square Sandbox — TEST ONLY` payment ledger records with 3 distinct references at the time of the check. No real charges were initiated.
 
 ## Held / next release gates
-- Build 128 is already submitted to Apple; do not cancel its review solely to apply minor dashboard polish. Package fixes separately as Build 129 candidate for TestFlight. Record its upload status before treating it as available.
+- Build 128 is already submitted to Apple and was previously verified Waiting for Review; its existing review submission was not changed. Build 129 containing only the two dashboard layout corrections archived successfully, passed code-signature validation, and uploaded successfully to App Store Connect on October 17, 2026 at approximately 11:45 AM Eastern. Apple reported the uploaded package is processing. TestFlight availability and public review status of Build 129 are NOT yet confirmed.
 - The public marketing website still displays KennelFlow while the management portal displays Kennel One. Kennel One public website changes remain in the staging branch / pull request, not merged.
 - Privacy, returns, shipping, hardware, warranty, and terms still need final policy review before rebranding the customer-facing store.
 - Confirm ownership/availability of any new domain; do not purchase or modify DNS without an approved target. Preserve existing working `kennelflowpro.app`, `app.kennelflowpro.app`, customer logins, API and webhook URLs.
