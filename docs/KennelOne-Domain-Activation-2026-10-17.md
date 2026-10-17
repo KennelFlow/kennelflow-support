@@ -34,3 +34,19 @@ Do **not** add either DNS record until the domain has been attached to the Rende
 - https://render.com/docs/custom-domains
 - Existing GitHub Pages site: https://kennelflowpro.app
 - Existing business app: https://app.kennelflowpro.app
+
+## Activation completed — 2026-10-17 afternoon
+
+- Added `kennelone.app` to the **separate** Render `kennelone-public` service. Render also added `www.kennelone.app` with a redirect to the apex domain.
+- Updated Namecheap Advanced DNS for **this domain only**: `@ A 216.24.57.1` and `www CNAME kennelone-public.onrender.com`. Removed the old `@` parking URL redirect by changing its record type; updated the existing `www` CNAME target. Preserved the email-forwarding SPF TXT record.
+- Render shows both domains **Verified**, with **Certificate Issued** for both.
+- Authoritative Namecheap DNS resolves `@` and `www` correctly; Cloudflare DNS and Google DNS resolved the apex A record as `216.24.57.1`.
+- HTTPS checks using the authoritative destination IP confirmed `https://kennelone.app` returns 200 with valid SSL and `https://www.kennelone.app` redirects 301 to the canonical apex domain with valid SSL.
+- Old marketing site and customer cloud portal remained operational: HTTPS 200 at `https://kennelflowpro.app` and `https://app.kennelflowpro.app/health`.
+- Local DNS cache on the connected Mac still returned the old Namecheap parking IP immediately after the update. Some viewers might temporarily see stale data; do not change working records in response to short-lived DNS caching.
+
+### Remaining post-domain work
+
+- Privacy and purchase policies must receive final business/legal approval. Prelaunch marketing website intentionally remains `noindex,nofollow` until launch signoff.
+- The new marketing site links to the currently working portal and published legal pages. Moving `app.kennelflowpro.app` to a new branded hostname is a separate authenticated-cookie/security migration and was intentionally not performed.
+- App Store public listing still displayed KennelFlow 2.7 at latest check; Build 130 upload was accepted but public review/availability is not verified from the Apple account.
