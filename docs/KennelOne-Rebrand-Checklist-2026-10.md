@@ -91,3 +91,16 @@ Never claim an App Store upload, domain purchase, production launch, or payment 
 - This does not establish that *all* NFC tags work, QR codes on a physical device were tested, or all customer records and subscription entitlements are intact.
 - Still pending before any public rebrand submission: existing saved data/account confirmation and current subscription or lifetime access/Restore Purchases. Keep current App Store review submission untouched until release decision.
 
+
+
+## Build 125 maintenance-record compatibility correction (October 16, 2026)
+
+**IMPORTANT: Build 124 is for internal testing only; do not submit it as the public rebrand.**
+
+A staging source comparison identified a hidden regression: the visible string replacement in Build 124 also changed the private \`UserDefaults\` namespace for device-only maintenance records from \`KennelFlow.maintenance.\` and \`KennelFlow.business.{identity}.maintenance.\` to \`Kennel One.*\`. That could hide preexisting records, even though the underlying bytes were not deleted.
+
+Build 125 fixes this by retaining the original KennelFlow storage keys and adding a one-time, non-destructive merge for any maintenance history newly created under the temporary Build 124 keys. It preserves unique records, favors the newer Build 124 version for duplicate entry IDs, maintains business scope, and protects corrupted records rather than overwriting either copy. NFC/deep links, Bundle ID, StoreKit IDs, iCloud/CloudKit and Square technical identifiers remain unchanged.
+
+**Automated iOS maintenance test suite: 20/20 PASS, 0 failures** using the \`MaintenanceTests\` Xcode scheme, including three new migration regression tests. Staged web regression suite: **21/21 PASS**.
+
+A replacement **Kennel One 2.8 Build 125** signed archive and TestFlight upload are being prepared. Do not claim TestFlight upload completed unless Xcode and App Store Connect independently show success. Following installation, physical-device tests of existing maintenance history, customer records, subscription restoration and NFC mapping are still required before public release.
