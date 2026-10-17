@@ -38,3 +38,11 @@ This is an engineering verification log, not a claim of public release.
 - Public Apple privacy label currently says "Data Not Collected." The backend holds off-device account and operational data, so an App Privacy disclosure audit is required before marking this release fully ready; see `docs/KennelOne-App-Privacy-Disclosure-Review.md`.
 - Registry RDAP reported `kennelone.app` not found/unregistered on 2026-10-17. No purchase or DNS change was attempted.
 - The authorized Mac test-only /tmp Xcode DerivedData directories were cleared after testing; signed 128 and 129 archives, source staging, screenshots, and upload logs remain preserved.
+
+## Afternoon update (supersedes older deployment status above)
+- Version 2.8 Build 130 was archived and uploaded; all 20 native tests passed. Apple processing and TestFlight readiness are not confirmed. The public App Store listing still shows KennelFlow 2.7.
+- GitHub Pages is serving Kennel One branding and current subscription prices from main commit b446d61 at kennelflowpro.app. Its deployment succeeded and eight safe-rebrand tests passed; checkout endpoint, product identifiers, and customer portal were preserved.
+- The authoritative domain is kennelone.app. Its public DNS and Render TLS are correctly configured. Both hostnames have certificates, while the local Mac router may still cache a parked IP. Forced-target HTTPS returns 200 at the apex and 301 at www.
+- The separate Render marketing site was redeployed to match the current support email. The staged full privacy draft is not published or approved, and indexing remains off.
+- Both production and isolated Sandbox payment services returned healthy responses. Three completed isolated Sandbox checkouts matched distinct Sandbox ledger references without new payment charges.
+- Employee permissions, authenticated cross-device use, NFC, and Apple Pay remain release acceptance tests. Do not label them completed based on unit tests alone.
