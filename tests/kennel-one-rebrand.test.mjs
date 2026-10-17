@@ -67,3 +67,12 @@ test('Marketing page links point to real local files or external resources',()=>
   }
  }
 });
+
+test('Legal pages accurately identify the previous brand and retain review notices',()=>{
+  for(const rel of ['privacy.html','terms.html']) {
+    const html=read(rel);
+    assert.match(html,/Kennel One, formerly KennelFlow\./);
+    assert.doesNotMatch(html,/formerly Kennel One/);
+    assert.match(html,/(must be reviewed and approved|require owner approval)/);
+  }
+});
