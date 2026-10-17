@@ -125,3 +125,19 @@ A replacement **Kennel One 2.8 Build 125** signed archive and TestFlight upload 
 - The existing public App Store **version 2.8 Build 123 remains Waiting for Review** and was not modified.
 - **PENDING:** On a physical device, update to TestFlight Build 125 and confirm maintenance history from both releases; confirm purchase entitlements and existing data. User previously confirmed NFC on Build 124, but Build 125 still requires acceptance.
 - DO NOT MERGE SITE REBRAND, CHANGE DNS, OR SUBMIT BUILD 125 FOR PUBLIC REVIEW UNTIL USER CONFIRMS REAL-DEVICE ACCEPTANCE AND PUBLIC BRANDING/DOMAIN/LEGAL METADATA ARE READY.
+
+
+## Build 126: global wallpaper and maintenance navigation correction
+
+User's October 16 screenshot of the Litters page showed that the shared app background still contained a large **KennelFlow** logo instead of the approved green **Kennel One K1** artwork. User also could not locate maintenance.
+
+### Code changes in the existing iOS staging project
+- \`RootView.swift\`: replaced the shared \`KennelFlowBackground\` implementation's *baked KennelFlowLogoWallpaper* image with a green/ivory gradient and the exact approved \`KennelFlowLogo\` K1 image asset (type name retained to avoid altering navigation or persistence). No remaining Swift references to \`Image("KennelFlowLogoWallpaper")\`.
+- \`MoreView.swift\`: added a prominent **Maintenance** navigation shortcut as the first entry, opening \`KFMaintenanceOverview\`. Existing **More > Kennel Management > Maintenance Tasks & Overdue** and kennel-level maintenance links are preserved.
+- \`MaintenanceViews.swift\`: the Maintenance overview now starts with an **Add & Manage Maintenance** section listing each kennel by natural name sort; tapping a kennel opens its full maintenance history and the existing Add, Edit, Delete, PDF, and attachment controls.
+- Version advanced to **Kennel One 2.8 Build 126**, retaining \`com.kennelflow.app\`, current Apple subscriptions and cloud keys.
+- Dedicated maintenance/history/QR test suite **20 of 20 passed**; full iOS simulator app compilation **BUILD SUCCEEDED**.
+- New signed archive and TestFlight upload conditional on signing and identity checks. Do not claim Apple upload complete until export upload log and App Store Connect confirmation.
+- Public App Store release held while user tests updated background, Maintenance shortcut, saved repairs, purchase entitlements and smart kennel NFC mappings.
+
+No customer data, Square settings, CloudKit container IDs, product IDs, or live website settings changed.
