@@ -30,3 +30,11 @@ This is an engineering verification log, not a claim of public release.
 - October 17: authoritative Google registry RDAP returned HTTP 404 for `kennelone.app`. That is not confirmation of checkout availability, domain purchase, ownership, DNS, or trademark rights. No purchase was made; current working domains and customer records were left untouched.
 - The connected Gmail account is the legacy KennelFlow support account; receiving mail at the proposed new Kennel One support address was not independently verified. Preserve the old support contact until mailbox validation.
 - An opt-in condition-based release watch is active, checking Apple's public listing periodically, alerting only for verified changes. It does not submit builds or modify production.
+
+## Continued verification
+- Build 129 itself passed 20/20 native iOS XCTest cases in addition to compiling, archiving, code-signing and uploading successfully. Its small-iPhone simulator screenshot was visually inspected after the layout fixes.
+- Isolated Square Sandbox branch checkout-to-ledger reconciliation joined on Square payment IDs embedded in the recorded reference: all 3 completed Sandbox orders match **exactly one** test ledger row each. No production charge or write.
+- Public US App Store page shows current in-app pricing as $10.99 monthly, $99.00 yearly, $299.99 lifetime, matching owner targets. App Store still publicly shows version 2.7 during the check.
+- Public Apple privacy label currently says "Data Not Collected." The backend holds off-device account and operational data, so an App Privacy disclosure audit is required before marking this release fully ready; see `docs/KennelOne-App-Privacy-Disclosure-Review.md`.
+- Registry RDAP reported `kennelone.app` not found/unregistered on 2026-10-17. No purchase or DNS change was attempted.
+- The authorized Mac test-only /tmp Xcode DerivedData directories were cleared after testing; signed 128 and 129 archives, source staging, screenshots, and upload logs remain preserved.
