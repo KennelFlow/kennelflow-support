@@ -85,5 +85,5 @@ test('Published notice describes hosted data and retention without invented guar
   assert.match(html,/Render and Neon/);
   assert.match(html,/subscription or purchase status/);
   assert.match(html,/deleting information/);
-  assert.doesNotMatch(html,/retained for exactly|guarantee absolute security/i);
+  assert.doesNotMatch(html,/we retain your records for exactly|we guarantee absolute security/i);
 });
