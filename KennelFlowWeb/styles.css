@@ -7,3 +7,7 @@
 .specialized-panel video{display:block;width:min(100%,640px);border-radius:12px;margin:12px 0}#reportContent img{max-width:100%;height:auto;image-rendering:pixelated}#reportContent>a{display:block;margin:12px 0}
 
 #reportDialog:has(.pedigree-chart){width:min(1400px,98vw)}.pedigree-chart{display:grid;grid-template-columns:repeat(6,minmax(120px,1fr));min-width:1050px;gap:8px;overflow:visible}.pedigree-generation{display:flex;flex-direction:column}.pedigree-generation>h3{font-size:12px;margin-bottom:10px}.pedigree-members{display:flex;flex:1;flex-direction:column;justify-content:space-around;gap:4px}.pedigree-dog{border:1px solid var(--line);border-left:3px solid var(--green);border-radius:5px;padding:5px;font-size:10px;overflow-wrap:anywhere;min-height:30px}.pedigree-dog small{display:block;font-size:8px}#reportDialog .card{overflow:auto}@media print{.pedigree-chart{min-width:0;gap:3px}.pedigree-dog{font-size:8px;min-height:22px;padding:3px}.pedigree-generation>h3{font-size:9px}}
+
+/* Kennel One branding — approved green K1 dog logo (staging only) */
+header .brand{display:inline-flex;align-items:center;gap:9px;white-space:nowrap}header .brand img{width:42px;height:42px;object-fit:cover;border-radius:10px;flex-shrink:0}header .brand span{margin-left:-6px}
+@media(max-width:420px){header .brand{font-size:20px}header .brand span{font-size:20px}header .brand img{width:34px;height:34px}}
