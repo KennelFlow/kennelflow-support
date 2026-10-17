@@ -158,3 +158,15 @@ No customer data, Square settings, CloudKit container IDs, product IDs, or live 
 - Owner updates iPhone TestFlight from Build125 to **Build126** and visually confirms the Litters screen no longer displays KennelFlow wallpaper and that **More > Maintenance** is the first option and opens existing kennel records.
 - Retest customer login, subscription/lifetime access restoration, existing maintenance notes, QR and NFC smart kennel links on the owner's device.
 - Do not submit rebrand to public review until this acceptance is confirmed.
+
+
+## Build 127: approved high-contrast green wallpaper
+
+User rejected the previous Build 126 wallpaper because the enlarged boxed app icon was visually cut off. They approved a darker mockup with a clearly visible K1 dog logo and KennelOne wordmark, no icon border or white square, over the existing sage/ivory color family.
+
+- New \`KennelOneK1Emblem.imageset\`: transparent K1/dog-only image derived from the approved original green K1 app art. Dark and lime-green colors retained; cream rounded-square icon border and background excluded. The app icon itself remains unchanged.
+- \`RootView.swift\` shared \`KennelFlowBackground\`: darker forest/sage blended SwiftUI gradients, center-aligned transparent K1 dog mark and live text **KennelOne** (forest-green Kennel, green gradient One). This is not a flattened mockup screenshot, so existing live cards, app content, and navigation remain functional.
+- Staged app version 2.8 Build **127**, same bundle ID \`com.kennelflow.app\`, account, data keys, StoreKit, CloudKit, Square and NFC identifiers.
+- Entire iOS simulator Debug build: **BUILD SUCCEEDED**. App installed and launched in iPhone 17 simulator; visually inspected screenshot of Dashboard after startup; no rectangular cream logo border is present. Simulator does not contain the owner's real litter/customer data, so on-device Litters acceptance still needed.
+- Release signing/archiving and internal TestFlight upload pending final verification; do not conflate successful local compilation with Apple processing or public release.
+- Public App Review submission, existing website and domain remain untouched until owner accepts this wallpaper in TestFlight.
