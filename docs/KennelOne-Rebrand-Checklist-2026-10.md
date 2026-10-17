@@ -191,3 +191,14 @@ User rejected the previous Build 126 wallpaper because the enlarged boxed app ic
 - Signed release verified: \`Kennel One 2.8 (127)\`, bundle ID \`com.kennelflow.app\`; Xcode \`ARCHIVE SUCCEEDED\`, upload \`EXPORT SUCCEEDED\`.
 - Screenshot from an iPhone 17 simulator launch inspected: Dashboard cards remain usable and old square logo border is gone. Human acceptance on the owner's real Litters screen and saved records still required.
 - **Do not submit Build 127 for public review or merge the staged website/domain rebrand until accepted.** Current public submission remains separate and untouched.
+
+
+## Build 128 App Store Connect submission — October 17, 2026
+
+- Existing App Store Connect app ID 6809212861 and bundle ID com.kennelflow.app preserved.
+- New name Kennel One, subtitle Kennel & Canine Management, promotional text, description, and version notes saved. Version metadata references the approved green K1 brand and mountain/forest background.
+- Seven real iPhone 17 Pro Build 128 screenshots (1206 by 2622): Home, Dogs, Litters, Duties, Calendar, Smart, More. Six 13-inch iPad Build 128 screenshots (2064 by 2752): Home, Dogs, Litters, Calendar, Smart, More. Apple confirmed screenshot counts 7/10 iPhone and 6/10 iPad.
+- Superseded KennelFlow preview videos and screenshots removed from pending iOS 2.8 gallery, not from Asset Library.
+- Previous pending iOS 2.8 Build 123 submission canceled, replaced with Build 128 and resubmitted. New submission ID 22a7950d-1142-486c-b5c0-45489bdbfd59, Oct 17 2026 1:58 AM Eastern, independently verified Waiting for Review.
+- Review details: https://appstoreconnect.apple.com/apps/6809212861/distribution/reviewsubmissions/details/22a7950d-1142-486c-b5c0-45489bdbfd59
+- Manual release after approval; live iOS 2.7, subscriptions, customer records, NFC, payments, cloud and domain not changed by this listing update.
