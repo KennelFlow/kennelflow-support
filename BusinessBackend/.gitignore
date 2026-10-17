@@ -1,0 +1,5 @@
+node_modules/
+private-function/node_modules/
+*.zip
+*.env
+.env.*
