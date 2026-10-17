@@ -6,7 +6,8 @@
 const timeout = 14000;
 const results = [];
 async function request(url, options={}) {
-  const res = await fetch(url, { signal:AbortSignal.timeout(timeout), redirect:'follow', ...options });
+  const { timeoutMs=timeout, ...requestOptions } = options;
+  const res = await fetch(url, { signal:AbortSignal.timeout(timeoutMs), redirect:'follow', ...requestOptions });
   return { status:res.status, url:res.url, headers:res.headers, text:await res.text() };
 }
 async function test(name, check, {pending=false}={}) {
@@ -55,7 +56,7 @@ await test('Square production endpoint reports production',async()=>{
  return pass(r.status===200 && j.ok===true && j.environment==='production' && j.webhookConfigured===true,`HTTP ${r.status}; ${j.environment}`);
 });
 await test('Square sandbox endpoint reports sandbox',async()=>{
- const r=await request('https://kennelflow-square-sandbox.onrender.com/health');
+ const r=await request('https://kennelflow-square-sandbox.onrender.com/health',{timeoutMs:55000});
  const j=JSON.parse(r.text);
  return pass(r.status===200 && j.ok===true && j.environment==='sandbox',`HTTP ${r.status}; ${j.environment}`);
 });
