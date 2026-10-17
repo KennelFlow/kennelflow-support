@@ -18,3 +18,10 @@
 5. Complete owner-reviewed privacy policy, App Store privacy-label disclosures, purchase terms and search-engine indexing. Public App Store still listed KennelFlow 2.7 at latest check.
 
 No actual customer data, payment ledger entries, or production messages were changed during these staging checks.
+
+## Later verification: Build 131 uploaded
+- Apple Xcode export and App Store Connect upload succeeded: `~/Developer/KennelOne-Build131-Upload.log` contains `Upload succeeded`, `Uploaded KennelFlow`, and `EXPORT SUCCEEDED`. There were two non-blocking warnings for third-party Square SDK dSYMs. **Processing/TestFlight status remains unverified** without an authenticated App Store Connect view.
+- The paired physical iPhone 17 Pro Max reports `Kennel One` version `2.8` build `131` installed via read-only `devicectl device info apps`. Installation source was not determined. The device and its stored data were not modified during this check.
+- Code signature of Build 131 archive validated successfully; simulator installation and process launch succeeded. The signed archive, native source, and all testing/upload logs were retained after cleaning only disposable Build 131 DerivedData.
+- Focused backend draft pull request [#11](https://github.com/KennelFlow/kennelflow-support/pull/11) was created, based on the current `main` branch, with all required backend files. This PR was not merged; the live website and payments remain unchanged.
+- Existing hourly Kennel One release watch now includes Build 131 processing/availability (only verified changes, no inferred TestFlight status).
