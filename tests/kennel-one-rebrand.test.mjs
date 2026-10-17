@@ -76,3 +76,13 @@ test('Legal pages accurately identify the previous brand and retain review notic
     assert.match(html,/(must be reviewed and approved|require owner approval)/);
   }
 });
+
+test('Staged privacy policy explains cloud data collection without publishing unverified claims',()=>{
+  const html=read('privacy.html');
+  assert.match(html,/employee names, email addresses/);
+  assert.match(html,/cloud features/);
+  assert.match(html,/CloudKit/);
+  assert.match(html,/Render and Neon/);
+  assert.match(html,/App Store's privacy summary/);
+  assert.match(html,/must be reviewed and approved/);
+});
