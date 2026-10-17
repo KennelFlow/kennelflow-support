@@ -170,3 +170,14 @@ User rejected the previous Build 126 wallpaper because the enlarged boxed app ic
 - Entire iOS simulator Debug build: **BUILD SUCCEEDED**. App installed and launched in iPhone 17 simulator; visually inspected screenshot of Dashboard after startup; no rectangular cream logo border is present. Simulator does not contain the owner's real litter/customer data, so on-device Litters acceptance still needed.
 - Release signing/archiving and internal TestFlight upload pending final verification; do not conflate successful local compilation with Apple processing or public release.
 - Public App Review submission, existing website and domain remain untouched until owner accepts this wallpaper in TestFlight.
+
+
+## Build 127 signed archive, upload, and acceptance gate
+
+- Build **Kennel One 2.8 (127)** with a dark full-color K1/dog background, live bold KennelOne wordmark and no cream icon box.
+- Full iOS simulator build: **BUILD SUCCEEDED**. Fresh iPhone 17 simulator install/launch succeeded. Captured and visually inspected Dashboard showing dark-green K1 behind actual content without the previous square border. The owner's Litters screen with real litter data remains a physical TestFlight acceptance test.
+- Signed release archive: **ARCHIVE SUCCEEDED**. Verified app identity \`Kennel One\`, \`com.kennelflow.app\`, version \`2.8\`, build \`127\`; \`codesign --verify --deep --strict\` passed.
+- Xcode App Store Connect upload: **UPLOAD SUCCEEDED / EXPORT SUCCEEDED** at around 00:27 AM Eastern on October 17, 2026.
+- Apple's TestFlight processing status requires independent UI verification. **Do not claim the build is available to testers until the processing result appears and the internal group is attached.**
+- Preserve previous production app review submission, Apple subscriptions and lifetime access, all live customer records, NFC assignments, cloud sync, Square payments, website and existing domain.
+- Next: have the owner install Build127 in TestFlight, inspect the Litters screen for full centered K1 emblem, native KennelOne text, dark green gradient, and no white box; recheck Maintenance and NFC tag. Do not submit public App Review until accepted.
