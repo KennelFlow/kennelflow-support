@@ -104,3 +104,13 @@ Build 125 fixes this by retaining the original KennelFlow storage keys and addin
 **Automated iOS maintenance test suite: 20/20 PASS, 0 failures** using the \`MaintenanceTests\` Xcode scheme, including three new migration regression tests. Staged web regression suite: **21/21 PASS**.
 
 A replacement **Kennel One 2.8 Build 125** signed archive and TestFlight upload are being prepared. Do not claim TestFlight upload completed unless Xcode and App Store Connect independently show success. Following installation, physical-device tests of existing maintenance history, customer records, subscription restoration and NFC mapping are still required before public release.
+
+
+## Build 125 signed archive and Apple upload verification
+
+- **October 16, 2026 ~11:45 PM Eastern:** corrected **Kennel One 2.8 (125)** was archived with Apple Developer Team 2J9CBS9546. Xcode reported **ARCHIVE SUCCEEDED**.
+- Xcode verified the archive signature and uploaded it through App Store Connect. Its log records **Upload succeeded**, **Uploaded KennelFlow**, **EXPORT SUCCEEDED**. Technical app/product ID remains \`com.kennelflow.app\` (unchanged); display name is Kennel One.
+- A separate local IPA export also succeeded, and the \`Apple Distribution\` signature matched the same Team ID. Production export has \`get-task-allow=false\`.
+- Apple App Store Connect TestFlight upload list initially displayed Build 125 **Processing**. Do not report ready for internal testers until confirmed in Apple UI.
+- Physical-device acceptance remains required: upgrade the owner's Build 124 TestFlight install to 125, confirm original kennel maintenance records plus any Build 124-created entries still appear, check existing account/other cloud records and monthly/yearly/lifetime entitlements, and recheck one existing physical NFC smart kennel tag.
+- Do not modify existing public **2.8 Build 123 Waiting for Review**, and do not submit Build 125 for public App Store review until acceptance, domain and metadata blockers are addressed.
