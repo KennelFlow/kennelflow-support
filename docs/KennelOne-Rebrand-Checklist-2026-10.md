@@ -114,3 +114,14 @@ A replacement **Kennel One 2.8 Build 125** signed archive and TestFlight upload 
 - Apple App Store Connect TestFlight upload list initially displayed Build 125 **Processing**. Do not report ready for internal testers until confirmed in Apple UI.
 - Physical-device acceptance remains required: upgrade the owner's Build 124 TestFlight install to 125, confirm original kennel maintenance records plus any Build 124-created entries still appear, check existing account/other cloud records and monthly/yearly/lifetime entitlements, and recheck one existing physical NFC smart kennel tag.
 - Do not modify existing public **2.8 Build 123 Waiting for Review**, and do not submit Build 125 for public App Store review until acceptance, domain and metadata blockers are addressed.
+
+
+## Build 125 App Store Connect processing confirmation
+
+- October 16, 2026, after upload, **iOS 2.8 Build 125** changed from **Processing** to **Complete** in App Store Connect upload history.
+- Build 125 appears in the TestFlight iOS builds list as **Ready to Submit** and is assigned to the existing **KennelFlow Beta Testers internal group** with **2 eligible testers**. This is internal TestFlight readiness, not a public App Review status.
+- The *What to Test* field for Build 125 was saved, then verified after reloading, including checks for legacy and Build 124 maintenance history, current records, subscription/lifetime restore, NFC/QR tags and cloud synchronization. Group assignment persisted.
+- Xcode release IPA independently re-exported and passed \`codesign --verify --deep --strict\`, with valid **Apple Distribution** signature, \`com.kennelflow.app\`, Build **125**, and production \`get-task-allow=false\`.
+- The existing public App Store **version 2.8 Build 123 remains Waiting for Review** and was not modified.
+- **PENDING:** On a physical device, update to TestFlight Build 125 and confirm maintenance history from both releases; confirm purchase entitlements and existing data. User previously confirmed NFC on Build 124, but Build 125 still requires acceptance.
+- DO NOT MERGE SITE REBRAND, CHANGE DNS, OR SUBMIT BUILD 125 FOR PUBLIC REVIEW UNTIL USER CONFIRMS REAL-DEVICE ACCEPTANCE AND PUBLIC BRANDING/DOMAIN/LEGAL METADATA ARE READY.
