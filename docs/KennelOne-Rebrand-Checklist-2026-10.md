@@ -84,3 +84,10 @@ Never claim an App Store upload, domain purchase, production launch, or payment 
 - Added *What to Test* release notes to Build 124, instructing the team to check old customer records, subscription and lifetime purchase restoration, existing QR/NFC tags, cloud synchronization, and branding. Save confirmed; notes persist after a page reload.
 - The public App Store version **2.8 Build 123** remains **Waiting for Review** and was not altered. No public App Review submission of Build 124.
 - Outstanding: independent proof that the existing customer login retains its records, that subscription entitlements restore in the actual TestFlight install, that a physical NFC tag and printed QR open the correct existing dog/kennel on a physical iPhone, and that two-way cloud updates match the web portal. **Do not mark these done from TestFlight installation count or unit tests alone.**
+
+## User-reported physical NFC smoke test (October 16, 2026)
+
+- User confirms that an existing kennel NFC tag **works** on Kennel One Build 124 after being asked whether it opens the correct kennel. Record as **user-reported PASS** for this one existing tag and kennel.
+- This does not establish that *all* NFC tags work, QR codes on a physical device were tested, or all customer records and subscription entitlements are intact.
+- Still pending before any public rebrand submission: existing saved data/account confirmation and current subscription or lifetime access/Restore Purchases. Keep current App Store review submission untouched until release decision.
+
