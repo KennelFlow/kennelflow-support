@@ -22,3 +22,13 @@ test('staged domain plan preserves old domains and requires verified TLS',()=>{
  assert.match(plan,/Do \*\*not\*\* add either DNS record until/);
  assert.match(plan,/app\.kennelflowpro\.app/);
 });
+
+test('public landing shows six genuine screenshot assets without missing links',()=>{
+ const page=read('deploy/kennelone-public/index.html');
+ for(const file of ['01_Home.jpg','02_Dogs.jpg','03_Litters.jpg','04_Duties.jpg','05_Calendar.jpg','06_Smart.jpg']){
+   assert.ok(existsSync(new URL('../deploy/kennelone-public/assets/screenshots/'+file,import.meta.url)));
+   assert.ok(page.includes('assets/screenshots/'+file));
+ }
+ assert.match(page,/loading="lazy"/);
+ assert.match(read('deploy/kennelone-public/styles.css'),/screen-gallery/);
+});

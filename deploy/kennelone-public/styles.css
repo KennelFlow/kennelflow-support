@@ -9,3 +9,15 @@ nav{display:flex;align-items:center;gap:26px;font-size:14px;font-weight:670}nav 
 .end-cta{background:linear-gradient(115deg,#073a29,#27664b);padding:57px max(6vw,24px);color:white;display:flex;align-items:center;justify-content:space-between;gap:35px}.end-cta h2{font-size:37px;margin-bottom:13px}.end-cta p{color:#d4e8db;margin:0}.light{background:#fff;color:var(--forest);white-space:nowrap}
 footer{padding:33px max(5vw,20px);display:flex;justify-content:space-between;gap:15px;align-items:center;flex-wrap:wrap;background:#f4f5ec;color:#456454;font-size:13px}footer>div:first-child{display:grid;gap:2px}footer strong{font-size:20px;color:var(--forest)}.footer-links{display:flex;gap:20px}footer p{width:100%;margin:7px 0 0;font-size:12px}
 @media(max-width:720px){.bar{align-items:flex-start;gap:12px}.brand{font-size:19px}.brand img{width:38px;height:38px}nav{gap:10px;font-size:12px;flex-wrap:wrap;justify-content:flex-end}nav a:first-child{display:none}.nav-cta{padding:8px 10px}.hero{min-height:585px}.hero-content{padding:35px 0;margin:auto}h1{font-size:clamp(43px,12vw,65px)}.hero-content>p{font-size:16px}.features{grid-template-columns:1fr}.section{padding:62px 18px}.features article{min-height:auto}.end-cta{flex-direction:column;align-items:flex-start}.end-cta h2{font-size:32px}.end-cta .button{white-space:normal}footer{flex-direction:column;align-items:flex-start}}
+
+
+/* Actual App Store screenshot previews — responsive, uncluttered layout. */
+.screenshot-section{background:#f0f3eb}
+.screen-gallery{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;align-items:start}
+.screen-gallery figure{margin:0;background:#fff;padding:15px 15px 20px;border-radius:25px;box-shadow:0 10px 30px rgba(10,55,34,.11)}
+.screen-gallery img{display:block;width:100%;height:auto;max-height:540px;object-fit:contain;background:#f8f9f2;border-radius:15px}
+.screen-gallery figcaption{padding:15px 8px 2px;display:flex;flex-direction:column;gap:2px}
+.screen-gallery figcaption strong{color:var(--forest);font-size:18px}
+.screen-gallery figcaption span{color:var(--muted);font-size:14px}
+@media(max-width:860px){.screen-gallery{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}}
+@media(max-width:520px){.screen-gallery{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.screen-gallery figure{padding:7px 7px 12px;border-radius:15px}.screen-gallery img{border-radius:10px}.screen-gallery figcaption{padding:10px 5px 0}.screen-gallery figcaption strong{font-size:14px}.screen-gallery figcaption span{font-size:12px}}
