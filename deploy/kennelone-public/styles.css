@@ -21,3 +21,6 @@ footer{padding:33px max(5vw,20px);display:flex;justify-content:space-between;gap
 .screen-gallery figcaption span{color:var(--muted);font-size:14px}
 @media(max-width:860px){.screen-gallery{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}}
 @media(max-width:520px){.screen-gallery{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.screen-gallery figure{padding:7px 7px 12px;border-radius:15px}.screen-gallery img{border-radius:10px}.screen-gallery figcaption{padding:10px 5px 0}.screen-gallery figcaption strong{font-size:14px}.screen-gallery figcaption span{font-size:12px}}
+
+/* Keep Kennel One store/support/portal navigation usable on smaller phones. */
+@media(max-width:560px){.bar{flex-direction:column;align-items:stretch;gap:12px}.bar nav{justify-content:space-between;gap:10px 14px}.footer-links{flex-wrap:wrap;gap:11px 19px}}
