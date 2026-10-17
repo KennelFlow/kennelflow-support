@@ -68,21 +68,22 @@ test('Marketing page links point to real local files or external resources',()=>
  }
 });
 
-test('Legal pages accurately identify the previous brand and retain review notices',()=>{
-  for(const rel of ['privacy.html','terms.html']) {
-    const html=read(rel);
-    assert.match(html,/Kennel One, formerly KennelFlow\./);
-    assert.doesNotMatch(html,/formerly Kennel One/);
-    assert.match(html,/(must be reviewed and approved|require owner approval)/);
-  }
+test('Published privacy notice is current while other legal terms remain review-gated',()=>{
+  const privacy=read('privacy.html');
+  assert.match(privacy,/Kennel One \(formerly KennelFlow\)/);
+  assert.doesNotMatch(privacy,/Draft website privacy|must be reviewed and approved before/i);
+  const terms=read('terms.html');
+  assert.match(terms,/Kennel One, formerly KennelFlow\./);
+  assert.match(terms,/(must be reviewed and approved|require owner approval)/);
 });
 
-test('Staged privacy policy explains cloud data collection without publishing unverified claims',()=>{
+test('Published notice describes hosted data and retention without invented guarantees',()=>{
   const html=read('privacy.html');
-  assert.match(html,/employee names, email addresses/);
-  assert.match(html,/cloud features/);
+  assert.match(html,/employee details/);
+  assert.match(html,/cloud or sharing features/);
   assert.match(html,/CloudKit/);
   assert.match(html,/Render and Neon/);
-  assert.match(html,/App Store's privacy summary/);
-  assert.match(html,/must be reviewed and approved/);
+  assert.match(html,/subscription or purchase status/);
+  assert.match(html,/deleting information/);
+  assert.doesNotMatch(html,/retained for exactly|guarantee absolute security/i);
 });
