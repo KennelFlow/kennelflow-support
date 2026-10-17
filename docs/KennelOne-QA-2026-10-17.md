@@ -23,3 +23,10 @@ This is an engineering verification log, not a claim of public release.
 - Confirm new support email can receive mail, and verify official App Store Connect subscription pricing, Apple review/release state, and any future App Store listing updates through authorized Apple access.
 - Automated simulations are not full real-device NFC, Apple Pay, StoreKit, or two-way production sync validation; keep these as explicit tests before final sign-off.
 - Final App Store release is not complete while the public listing remains 2.7.
+
+
+## Follow-up checks and deliverables
+- October 17: three 1080-by-1920, nine-second H.264 MP4 promotional **screen tours** were generated from genuine app screenshots and verified by decoding a video frame. Clips: KennelOne-Overview.mp4, KennelOne-Daily-Care.mp4 and KennelOne-Smart-Kennels.mp4. Copies are in a KennelOne-Marketing-Videos folder on the owner's Mac Desktop. These are *not* recordings of live interactions, and should not be described as Apple App Preview recordings.
+- October 17: authoritative Google registry RDAP returned HTTP 404 for `kennelone.app`. That is not confirmation of checkout availability, domain purchase, ownership, DNS, or trademark rights. No purchase was made; current working domains and customer records were left untouched.
+- The connected Gmail account is the legacy KennelFlow support account; receiving mail at the proposed new Kennel One support address was not independently verified. Preserve the old support contact until mailbox validation.
+- An opt-in condition-based release watch is active, checking Apple's public listing periodically, alerting only for verified changes. It does not submit builds or modify production.
