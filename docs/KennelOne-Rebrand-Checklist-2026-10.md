@@ -49,3 +49,27 @@
 - Apple has accepted the rebranded update.
 
 Never claim an App Store upload, domain purchase, production launch, or payment migration completed without independent verification.
+
+## Build 124 TestFlight upload (October 16, 2026)
+
+**Archive and Apple upload accomplished — this does NOT equal TestFlight-ready or App Store approval.**
+
+- Kennel One 2.8 (124), bundle ID \`com.kennelflow.app\`.
+- iOS simulator app compiled, installed and launched successfully; screenshot confirms Kennel One green K1 branding in dashboard.
+- QR/deep-link simulator smoke test prompted **Open in “Kennel One”?**, confirming the existing application link routing remains recognized. Does not test a real assigned NFC tag or customer data.
+- 14 focused website integration tests passed (including authentication/roles and generated QR decoding). Earlier all 21 website tests passed.
+- Xcode signed release archive succeeded at \`~/Developer/KennelOne-Build124.xcarchive\`.
+- Xcode export/upload log \`/tmp/KennelOne-Build124-Upload.log\` records **Uploading “KennelFlow.ipa” is complete**, **Uploaded package is processing**, **Upload succeeded**, and **EXPORT SUCCEEDED** (approximately 10:59 PM Eastern on October 16). An earlier upload-file entity was replaced by Apple's service; the upload workflow recovered and succeeded.
+- Independent local export of the same archive succeeded; release IPA signature verified **Apple Distribution**, matching Team ID; release \`get-task-allow=false\`, and original CloudKit, Square Apple Pay and NFC entitlements intact.
+- Apple reported missing dSYM files for third-party Square SDK frameworks; these were warnings, not blocking errors.
+- Existing Apple subscription product identifiers for monthly, yearly and lifetime were preserved unchanged.
+- **Actual App Store Connect processing completion and TestFlight tester availability NOT verified yet.**
+- **Actual customer login, existing Apple purchase/restore and live assigned NFC tag on physical device NOT verified yet.** Do not treat code-level or mock test passes as proof. Confirm using authorized test devices/accounts and no real charges before public release.
+- No public App Store review submission, website deployment, new domain registration, DNS change, or payment migration was made.
+
+### Release blockers remaining
+
+1. Confirm App Store Connect build processing completes and Build 124 becomes available to internal TestFlight testers.
+2. Perform physical iPhone TestFlight tests: existing account retains dogs/kennels and other records; subscription and lifetime access restore correctly; scanning an existing printed QR code and programmed NFC tag resolves the correct saved kennel/dog; live cloud sync works; Square integration tested safely in sandbox.
+3. Confirm app name **Kennel One** is available/accepted in App Store Connect and required metadata, privacy policy, terms and support branding are accurate before submitting for public App Review.
+4. Do not change public domains or production payment callbacks until new domain is registered and DNS/HTTPS/redirect/Apple Pay checks have passed.
