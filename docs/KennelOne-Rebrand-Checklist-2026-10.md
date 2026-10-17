@@ -202,3 +202,20 @@ User rejected the previous Build 126 wallpaper because the enlarged boxed app ic
 - Previous pending iOS 2.8 Build 123 submission canceled, replaced with Build 128 and resubmitted. New submission ID 22a7950d-1142-486c-b5c0-45489bdbfd59, Oct 17 2026 1:58 AM Eastern, independently verified Waiting for Review.
 - Review details: https://appstoreconnect.apple.com/apps/6809212861/distribution/reviewsubmissions/details/22a7950d-1142-486c-b5c0-45489bdbfd59
 - Manual release after approval; live iOS 2.7, subscriptions, customer records, NFC, payments, cloud and domain not changed by this listing update.
+
+## Website and online hardware store rebrand — October 17, 2026
+
+**Staging only** (branch kennel-one-rebrand-preparation); no live DNS, Square webhook, or production Render modifications.
+
+- Homepage uses the user's approved Kennel One K1 + mountains + forest image, directly copied from the approved app wallpaper, with responsive uncropped sizing.
+- Store and main site have Kennel One product names and messaging. Same nine original NFC/holder/facility kits and IDs/prices, preserving existing carts and Square integration.
+- All nine product descriptions/names/prices now match across assets/site.js, server.js checkout and SquarePaymentServer/server.js. Future Square order notes identify Kennel One Store (formerly KennelFlow) for historic continuity; no existing Square product IDs, payment token/location, webhook, or order histories modified.
+- Explicit notice that existing inventory/photos may still show original KennelFlow branding, so physical legacy-labeled stock is never mislabeled.
+- Replaced broken support form with a real mailto link to existing kennelflowapp@gmail.com; replaced inactive App Store link/QR placeholder with real existing Apple app listing ID 6809212861.
+- Privacy and terms show Kennel One (formerly KennelFlow). LEGAL REVIEW still required for shipping/returns/refund terms and complete privacy disclosures before public release.
+- Kennel One Portal header links to existing app.kennelflowpro.app for customer continuity; do not move portal origin until sign-in/session/security testing.
+- Portal downloadable CSV file prefix is kennelone while preserving data keys (kennelflow.pendingSquare.), smart-tag URI scheme (kennelflow://smart/), StoreKit IDs, customer records, backend and checkout endpoints.
+- Marketing pricing page currently stages owner-requested $10.99/month, $99.00/year and $299.99 lifetime target amounts; MUST independently verify live App Store Connect pricing and user approval before publishing. This does NOT modify Apple billing.
+- Added automated tests for all nine front-end/back-end catalog prices, legacy data IDs, Apple link, branding assets and static hrefs. 7/7 marketing tests and 21/21 web-portal tests pass; changed JavaScript passes syntax checks.
+- New kennelone.app domain ownership not verified, and DNS did not resolve on current Mac. No CNAME, redirect, live Render deploy or Square origin changes made.
+- Release order: acquire/verify domain; validate branding and legal policies; configure web/portal/shop DNS and TLS; validate checkout origins, redirects and callbacks in sandbox, login cookies and existing NFC links; keep original domains as aliases; then publish live brand.

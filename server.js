@@ -25,7 +25,7 @@ const client = new Client({ bearerAuthCredentials: { accessToken }, environment 
 const PRODUCTS = Object.freeze({
   'dog-tag': { name: 'Smart Kennel Management Dog Tag', cents: 999 },
   'kennel-crate-tag': { name: 'Smart Kennel Management Kennel/Crate Tag', cents: 1499 },
-  'nfc-1': { name: 'KennelFlow NFC Tag', cents: 499 },
+  'nfc-1': { name: 'Kennel One-Compatible NFC Tag', cents: 499 },
   'nfc-5': { name: '5-Pack NFC Tags', cents: 2299 },
   'nfc-10': { name: '10-Pack NFC Tags', cents: 3999 },
   'nfc-25': { name: '25-Pack NFC Tags', cents: 8499 },
@@ -88,7 +88,7 @@ app.post('/store/create-checkout', async (req,res) => {
     if(flatShippingCents>0){lineItems.push({name:'Standard Shipping',quantity:'1',item_type:'ITEM',base_price_money:{amount:flatShippingCents,currency:'USD'}});}
 
     const name=[buyer.firstName,buyer.lastName].filter(Boolean).join(' ').trim();
-    const paymentNote=['KennelFlow Store',name,notes].filter(Boolean).join(' • ').slice(0,500);
+    const paymentNote=['Kennel One Store (formerly KennelFlow)',name,notes].filter(Boolean).join(' • ').slice(0,500);
     const body={
       idempotency_key:crypto.randomUUID(),
       order:{location_id:configuredLocationID,line_items:lineItems,pricing_options:{auto_apply_taxes:true}},

@@ -539,7 +539,7 @@ function exportVisibleRecords(){
   };
   const lines=[['recordType','revision','deletedAt',...keys].map(safe).join(','),...selected.map(r=>[r.type,r.revision,r.deleted_at||'',...keys.map(k=>r.record?.[k])].map(safe).join(','))];
   const blob=new Blob(['\\ufeff'+lines.join('\\r\\n')],{type:'text/csv;charset=utf-8'});
-  const href=URL.createObjectURL(blob),link=el('a');link.href=href;link.download='kennelflow-'+type+(deleted?'-deleted':'')+'-'+new Date().toISOString().slice(0,10)+'.csv';
+  const href=URL.createObjectURL(blob),link=el('a');link.href=href;link.download='kennelone-'+type+(deleted?'-deleted':'')+'-'+new Date().toISOString().slice(0,10)+'.csv';
   document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(href),10000);
 }
 const exportButton=button('Export CSV',exportVisibleRecords,'secondary');

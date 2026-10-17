@@ -1,3 +1,21 @@
+# Kennel One — website & store staging (October 2026)
+
+This branch prepares the Kennel One rebrand of the existing KennelFlow marketing website, online NFC hardware shop, and customer management portal. The existing Apple app/bundle ID, customer data, Square integrations, and physical hardware remain compatible.
+
+- Marketing website: the approved Kennel One K1 mountain/forest artwork, current App Store download link, updated public copy and support email.
+- Hardware shop: all nine existing product SKUs with unchanged cents/quantities, renamed storefront labels, original hardware compatibility notice, and Square-hosted checkout.
+- Customer portal: renamed UI and downloaded CSV prefix, with existing authentication, database and NFC URI links preserved.
+- App Store listing: ID 6809212861. A public app update is pending Apple's review; do not claim the new branded app version is live before Apple approval.
+- No production deployment, DNS cutover, checkout origin/redirect changes, or Square account changes are authorized by this staging branch alone. The existing production domains remain functional during migration.
+- Staged owner-requested software price targets ($10.99/month, $99.00/year, $299.99 lifetime) must be checked in App Store Connect before publishing. Hardware catalog pricing is unchanged.
+- Privacy policy, hardware shipping/returns and refund policy require final owner/legal approval before publishing this staging website.
+- Test the marketing/shop changes with node --test tests/kennel-one-rebrand.test.mjs; portal with cd KennelFlowWeb && npm test; backend with cd BusinessBackend && npm ci && npm test.
+- New domain kennelone.app, new subdomains/SSL and Square/Apple Pay validation are pending proof of registrar ownership. Keep existing kennelflowpro.app / app.kennelflowpro.app as aliases and all legacy QR deep links operational.
+
+---
+
+## Legacy development history
+
 # KennelFlow Website — Build 1
 
 This is a responsive static website prototype for KennelFlow.

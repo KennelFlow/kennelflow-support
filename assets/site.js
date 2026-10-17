@@ -1,7 +1,7 @@
 const PRODUCTS = {
   'dog-tag': {name:'Smart Kennel Management Dog Tag', price:9.99, inStock:true},
   'kennel-crate-tag': {name:'Smart Kennel Management Kennel/Crate Tag', price:14.99, inStock:true},
-  'nfc-1': {name:'KennelFlow NFC Tag', price:4.99, inStock:true},
+  'nfc-1': {name:'Kennel One-Compatible NFC Tag', price:4.99, inStock:true},
   'nfc-5': {name:'5-Pack NFC Tags', price:22.99, inStock:true},
   'nfc-10': {name:'10-Pack NFC Tags', price:39.99, inStock:true},
   'nfc-25': {name:'25-Pack NFC Tags', price:84.99, inStock:true},
