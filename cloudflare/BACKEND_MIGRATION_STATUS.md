@@ -26,3 +26,22 @@ Updated October 18, 2026
 
 ## Safety
 Do not shut off or delete Render yet. Until these gates pass, the working live customer portal/payment system would be damaged by closing those services. Do not commit tokens or credentials.
+
+
+## October 18 continuation: Cloudflare Square migration stages
+- Direct Kennel One catalog checkout (including server-side official product pricing) has been built in `cloudflare/public/functions/_lib/square-checkout.mjs`; the storefront Function uses it **only** when `SQUARE_DIRECT_CHECKOUT=true` and the corresponding Square runtime credentials are available. Production still uses its existing verified Render checkout bridge.
+- Direct checkout preview: https://direct-square-preview.kennelone-public.pages.dev
+- A completely separate Cloudflare Pages project `kennelone-payments` and D1 database `kennelone-payment-events` are created. Only Preview has an EVENTS D1 binding.
+- Square payment webhook staging preview: https://payments-migration-preview.kennelone-payments.pages.dev
+- Webhook staging verifies Square HMAC using the raw body and the subscribed notification URL, verifies completed Square payment/order via Square REST before queuing, and stores a single entry per payment ID in D1. **It deliberately returns 503 for unsettled completed payments** rather than acknowledging a payment without writing the downstream ledger and notifications. This is **not ready for a Square subscription URL cutover**.
+- The webhook has no live Square credentials. Only synthetic test keys and mocked REST responses were used in tests. Never point production Square webhook subscriptions to this preview.
+- Most recent automated test counts: portal API 16, storefront 13, webhook 8 (37 total passing).
+- The preview endpoints respond with the expected safe auth, missing-secret and method rejection statuses. No real charges or production record writes occurred.
+- Because Render's connected app does not expose production secret retrieval and a direct secure handoff is not completed, no production keys have been copied into Cloudflare. Configure Cloudflare encrypted secrets through an approved secure access workflow before any payment cutover.
+- Other live payment integrations (QuailFlow, RabbitFlow, Yard Patrol) share the existing Square service and must be migrated or explicitly kept online before Render is retired.
+
+### Next gated steps
+1. Securely connect non-production Square credentials to Cloudflare **Preview** secrets, validate a real Square sandbox payment link and test webhook notification.
+2. Implement/verify atomic ledger settlement in Neon and idempotent webhook notifications for all stores and apps; validate full payment workflow including receipt delivery.
+3. Run genuine test-account (not owner/customer production) login, cloud read/write/upload and staff access against the D1-powered portal preview.
+4. After an audited side-by-side comparison and controlled DNS/webhook transition, switch production with rollback and recheck all apps; only then remove Render services and close the account.

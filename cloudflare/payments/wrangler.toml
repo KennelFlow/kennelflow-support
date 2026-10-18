@@ -1,0 +1,14 @@
+name = "kennelone-payments"
+compatibility_date = "2026-10-18"
+pages_build_output_dir = "./public"
+
+# Production has NO Square payment bindings. No production webhooks are routed here.
+[env.production]
+
+# Preview-only D1 event queue. Production stays with existing Square Render server.
+[env.preview]
+
+[[env.preview.d1_databases]]
+binding = "EVENTS"
+database_name = "kennelone-payment-events"
+database_id = "657e4560-6187-4a97-aefa-76fae182cb57"

@@ -34,3 +34,11 @@ To test on a separate Preview branch, use a 32-byte random hex KO_SESSION_KEY in
 
 ### D1 session store
 Cloudflare D1 'kennelone-session-vault' (binding SESSIONS) can replace KO_SESSION_KEY entirely. The browser receives a random host-only HttpOnly cookie; the database stores its hash, the upstream Neon token, and an expiration timestamp (8 hours). Login purges expired records, logout removes the session and calls Neon logout. Never expose the D1 database contents in logs or static assets. The database schema is in `cloudflare/portal/schema.sql`. Enable the binding in *preview* first, test live-login and authenticated data, then separately enable in production. Existing Render sessions fall back until expiry. Keep Square's Render backend until independently migrated.
+
+
+## Kennel One direct store checkout and payment webhook staging
+The public checkout's direct Square integration is feature-gated behind `SQUARE_DIRECT_CHECKOUT=true`. Use Cloudflare secrets `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID` and `SQUARE_ENVIRONMENT` (sandbox/production), with optional `STORE_FLAT_SHIPPING_CENTS` and `STORE_SUCCESS_URL`. Do not change production configuration until Sandbox test payments and downstream notifications/ledger settlement pass. With the feature gate off, the live storefront retains its existing Render bridge.
+
+The separate `cloudflare/payments` project contains an HMAC-verifying Square webhook staging implementation, D1 event schema, and mock tests. Deploy to a **preview** only; it is deliberately not an active webhook receiver for completed payments because downstream settlement/notification is not ported. Webhook preview requires `SQUARE_WEBHOOK_SIGNATURE_KEY`, `SQUARE_WEBHOOK_URL` (exact subscription URL), `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID`, `SQUARE_ENVIRONMENT`, and a D1 `EVENTS` binding. A 503 on an unsettled webhook is **intentional**; activating this endpoint for production would not be acceptable.
+
+Local checks: `cd cloudflare/public && npm test`, `cd cloudflare/payments && npm test`, `cd cloudflare/portal && npm test`. Production payment checkout routes and legacy app webhooks remain on Render.

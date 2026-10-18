@@ -1,3 +1,4 @@
+import {createSquareCheckout} from '../_lib/square-checkout.mjs';
 // Same-origin checkout gateway for the Kennel One Cloudflare Pages storefront.
 // The production Square service remains on the existing payments.kennelone.app host.
 // No payment credentials or customer payment-card information is stored here.
@@ -7,7 +8,7 @@ const json = (body, status) => new Response(JSON.stringify(body), {
                     'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }
 });
 
-export async function onRequest({ request }) {
+export async function onRequest({ request, env = {} }) {
   const own = new URL(request.url);
   if (request.method !== 'POST') return json({error: 'Method not allowed'}, 405);
   const origin = request.headers.get('origin');
@@ -27,6 +28,16 @@ export async function onRequest({ request }) {
     return json({error:'Your cart is empty'}, 400);
   }
   try {
+    // Only explicitly configured projects use direct Square REST. By default,
+    // live production keeps the previously tested Render bridge as rollback.
+    if(env.SQUARE_DIRECT_CHECKOUT==='true'){
+      try{
+        const result=await createSquareCheckout(payload,env);
+        return json(result,200);
+      }catch(e){
+        return json({error:e.message||'Checkout temporarily unavailable'},e.status||503);
+      }
+    }
     const response = await fetch(DESTINATION, {
       method: 'POST',
       headers: {'Content-Type': 'application/json', 'Accept':'application/json'},
