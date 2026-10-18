@@ -1,12 +1,16 @@
-# Independent Kennel One public landing (prelaunch)
+# Kennel One public website
 
-This directory is a standalone static site suitable for a separate host, with **no changes to** the working kennelflowpro.app GitHub Pages site.
+Live site: https://kennelone.app
+Business portal: https://app.kennelone.app
+Store: https://kennelone.app/shop.html
+Support: https://kennelone.app/support.html
 
-- Primary target: https://kennelone.app (after DNS and HTTPS verification)
-- No index/robots until final public review
-- Uses approved Kennel One logo and mountain background
-- Customer sign-in remains at https://app.kennelflowpro.app
-- Privacy, terms, and support link to already published working pages
-- No customer data, subscriptions, payments, or business cloud backend changes
+This is the public-facing static website hosted on Cloudflare Pages.
+The store checkout page uses a same-origin Cloudflare Pages Function;
+it continues to call the existing Square production service until the
+Cloudflare payment, settlement and notification migration is fully tested.
 
-Do not replace the current repository root CNAME. Enable the new domain only after creating/validating a separate host and obtaining its exact DNS requirements. After completing App Store review and approved policy migration, remove the robots noindex, update canonical and legal URLs, and check every link.
+Changes to payments, accounts and data synchronization require their own
+isolated staging checks. Do not remove existing production backend services
+until Square webhooks, completed ledger entries, receipts, mobile apps and
+customer sign-in have been verified end to end.

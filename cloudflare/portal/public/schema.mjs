@@ -1,4 +1,4 @@
-// Fields and enum values follow the existing KennelFlow Codable models.
+// Fields and enum values follow the existing app Codable models.
 export const models = {
   "Dog": [
     {

@@ -63,3 +63,22 @@ Do not shut off or delete Render yet. Until these gates pass, the working live c
 - Until direct Square checkout is live and verified, first-visit purchases may experience the remaining Render wait. **Do not stop Render or remove the existing Square webhook URL.**
 - The staging payment preview `/health` confirmed D1 event storage connected, all payment credentials absent, and settlement disabled. Zero real or synthetic payment-event rows were stored remotely.
 - Latest tests on October 18: portal 16, public-store checkout 13, payments 35 = 64 passed. Changes saved in the `kennelone-cloudflare-migration` GitHub branch. Production was not switched.
+
+
+## Continuation audit: direct portal parity, preview bindings, public copy
+- Expanded Cloudflare direct portal routes: `/api/signup`, `/api/password`, `/api/business-profile` and per-kennel `/private-messages` GET/POST. Owner and member authorization is checked before forwarding, with Neon retaining final authority.
+- Added `cloudflare/portal/tests/parity.test.mjs` covering schema validation, secure Neon forwarding, password changes, owner-only account edits, private-message tenant boundaries and invalid request rejection.
+- Confirmed in the Cloudflare dashboard that the Pages **Preview** environment has `SESSIONS` D1 binding and **Production** has no new D1 binding. Validated direct Preview runtime, not only local tests.
+- Deployed updated portal backend **Preview only**; intentionally left live customer authentication bridged to Render. The temporary binding diagnostic was removed and the Preview redeployed cleanly.
+- Fixed the public NFC scanner text to display 'Kennel One' instead of the former app name. Preserved compatibility-critical NFC URI prefixes and deterministic record IDs so existing programmed tags and customer data still work.
+- Redeployed the static customer-portal assets to production with the proven legacy API bundle; verified the live scanner reads 'Kennel One', and unauthenticated `/api/me` still rejects with 401.
+- Updated public-site README to reflect Cloudflare live hosting instead of prelaunch/old domains. All user-visible marketing pages continue to use Kennel One branding.
+- Retested direct backend `/v2/capabilities` and production/public host responses. No production transaction or customer database writes were made.
+- Tests now passing: portal 22, storefront 13, payment settlement/webhook 35 (70 overall).
+
+### Why full Render retirement remains blocked
+- Only the wrong/unverified Neon project is visible from the connected Neon app. Production payment ledger credentials and correct database identity have **not** been verified; do not run SQL against the wrong Neon project.
+- Existing connected management tools do not expose a safe, approved transfer for Square production and Sandbox secrets to Cloudflare Preview. Do not embed or print tokens into code, logs or chat.
+- Other applications still share Render's Square backend. QuailFlow, RabbitFlow and Yard Patrol checkout/status/webhook endpoints require full migration and testing before turning that service off.
+- Production signed Square webhooks and email/SMS receipts must pass end-to-end Sandbox tests with the correct provider configuration before replacing production endpoint URLs.
+- Therefore **do not close the Render account or shut down its portal, Square production or sandbox services** yet. Frontends on Cloudflare already work; replacing an active backend without the missing credentials would interrupt logins or real payments.

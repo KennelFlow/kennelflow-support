@@ -49,3 +49,9 @@ Local checks: `cd cloudflare/public && npm test`, `cd cloudflare/payments && npm
 Merchant order-email notifications are available via Resend only when `ENABLE_STORE_NOTIFICATIONS=true` and encrypted `RESEND_API_KEY`, `ORDER_NOTIFICATION_EMAIL` and `RESEND_FROM_EMAIL` are set. No notification or customer email is sent unless Square's completion is independently confirmed. Production remains disabled; SMS and other stores still require migration.
 
 **No production cutover is authorized by the existence of the code.** The live Square webhook is still on Render. Do not set production payment environment secrets or enable webhook routes before testing with isolated Square Sandbox plus matching Neon database.
+
+
+## Portal direct API parity and safe live static fix
+The direct Cloudflare portal API now includes signup, password updates, business-profile edits, and authorized private messages in addition to records, employees, invitations and D1 sessions. These were verified with regression tests and a Preview deploy. Only Preview is bound to the new `SESSIONS` D1 database; production continues through the existing legacy API bridge pending real-account end-to-end tests and Square cutover.
+
+The live NFC scanner branding was corrected to Kennel One separately from the backend change; existing protocol identifiers are compatibility-critical and must not be renamed without an NFC/data migration plan.

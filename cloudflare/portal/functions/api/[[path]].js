@@ -131,6 +131,18 @@ async function direct(request,env={},fetcher=fetch) {
     }catch{/* direct login is valid even while legacy payment gateway sleeps */}
     return reply;
   }
+  if(path==='/api/signup'&&method==='POST'){
+    const input=await parseJSON(request,16384);
+    const email=String(input.email||'').trim().toLowerCase();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254||
+       typeof input.password!=='string'||input.password.length<16||input.password.length>256||
+       typeof input.name!=='string'||!input.name.trim()||input.name.length>120||
+       typeof input.kennelName!=='string'||!input.kennelName.trim()||input.kennelName.length>120)
+      throw fail(400,'Valid email, name, business name and a password of 16–256 characters required');
+    return forward(await upstream('/v2/signup',null,'POST',{
+      email,password:input.password,name:input.name.trim(),kennelName:input.kennelName.trim()
+    },false,fetcher));
+  }
   if(path==='/api/invitations/accept'&&method==='POST'){
     const {token,email,name,password}=await parseJSON(request,16384);
     if(!/^[a-f0-9]{64}$/.test(token||'')||typeof email!=='string'||email.length>254||typeof name!=='string'||!name.trim()||name.length>120||typeof password!=='string'||password.length<16||password.length>256)throw fail(400,'Enter your invitation, email, name, and a password of 16–256 characters');
@@ -150,6 +162,29 @@ async function direct(request,env={},fetcher=fetch) {
   }
   if(!session)return jsonResponse(401,{error:'Sign in required'});
   const token=session.token;
+  if(path==='/api/password'&&method==='POST'){
+    const input=await parseJSON(request,16384);
+    if(typeof input.currentPassword!=='string'||!input.currentPassword||input.currentPassword.length>256||
+      typeof input.newPassword!=='string'||input.newPassword.length<16||input.newPassword.length>256)
+      throw fail(400,'Valid current password and new password of 16–256 characters required');
+    return forward(await upstream('/v2/password',token,'POST',{
+      currentPassword:input.currentPassword,newPassword:input.newPassword
+    },false,fetcher));
+  }
+  if(path==='/api/business-profile'&&method==='PATCH'){
+    const input=await parseJSON(request,16384),kennelID=String(input.kennelID||'').toLowerCase();
+    if(!uuid(kennelID))throw fail(400,'Invalid business ID');
+    const membershipRole=await membership(token,kennelID,fetcher);
+    if(membershipRole.role!=='owner')throw fail(403,'Only the business owner can edit this account');
+    if(typeof input.email!=='string'||input.email.length>254||
+      typeof input.ownerName!=='string'||input.ownerName.length>120||
+      typeof input.businessName!=='string'||input.businessName.length>120||
+      (input.currentPassword!==undefined&&(typeof input.currentPassword!=='string'||input.currentPassword.length>256)))
+      throw fail(400,'Invalid account details');
+    // Neon remains the final authority: it validates prior email/business name,
+    // the existing password for login-email changes, and website/phone formats.
+    return forward(await upstream('/v2/business-profile',token,'PATCH',input,false,fetcher));
+  }
   if(path==='/api/me'&&method==='GET')return forward(await upstream('/v2/me',token,'GET',undefined,false,fetcher));
   if(path==='/api/kennels'&&method==='GET'){
     const r=await upstream('/v2/me',token,'GET',undefined,false,fetcher),v=await r.json();
@@ -160,6 +195,23 @@ async function direct(request,env={},fetcher=fetch) {
     // Never expose checkout signing secrets or simulate a completed payment here.
     if(!cookieValue(request,'kf_session'))return jsonResponse(503,{error:'Payment gateway is reconnecting. Sign out and sign in again.'});
     return legacyCall(request,fetcher);
+  }
+  const messages=/^\/api\/kennels\/([^/]+)\/private-messages$/.exec(path);
+  if(messages&&['GET','POST'].includes(method)){
+    const scope=messages[1].toLowerCase();
+    if(!uuid(scope))throw fail(400,'Invalid kennel ID');
+    const k=await membership(token,scope,fetcher);
+    if(!['owner','admin','staff'].includes(k.role))throw fail(403,'No private-message access');
+    const dest='/v2/kennels/'+scope+'/private-messages';
+    if(method==='GET')return forward(await upstream(dest,token,'GET',undefined,false,fetcher));
+    const {id,recipientEmail,body}=await parseJSON(request,16384);
+    if(!uuid(id)||typeof recipientEmail!=='string'||recipientEmail.length>254||
+       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)||
+       typeof body!=='string'||!body.trim()||body.trim().length>4000)
+      throw fail(400,'Provide a valid recipient and message up to 4000 characters');
+    return forward(await upstream(dest,token,'POST',{
+      id:id.toLowerCase(),recipientEmail:recipientEmail.trim().toLowerCase(),body:body.trim()
+    },false,fetcher));
   }
   const employee=/^\/api\/kennels\/([^/]+)\/(members|invitations|clock|history)(?:\/([^/]+))?$/.exec(path);
   if(employee){
