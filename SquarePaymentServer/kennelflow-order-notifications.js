@@ -29,8 +29,8 @@ function orderDetails(order,payment,stores){
   let matchedProducts=null;
   for(const [name,products] of Object.entries(stores||{})){
     const productNames=new Set(Object.values(products).map(p=>p.name));
-    const matches=allItems.filter(item=>productNames.has(String(item?.name||'')));
-    if(matches.length){ storeName=name; matchedProducts=matches; break; }
+    const matches=allItems.filter(item=>productNames.has(String(item?.name||'').replace('KennelFlow NFC Tag','Kennel One NFC Tag')));
+    if(matches.length){ storeName=name==='KennelFlow'?'Kennel One':name; matchedProducts=matches; break; }
   }
   if(!matchedProducts) return null;
   const items=matchedProducts;
@@ -46,7 +46,7 @@ function orderDetails(order,payment,stores){
     customerEmail:payment?.buyer_email_address||'See Square order',
     customerPhone:shipment.phone_number||'See Square order',
     total:money(order?.total_money?.amount ?? payment?.amount_money?.amount ?? 0),
-    items:items.map(item=>(item.quantity||'1')+' × '+item.name).join('\n'),
+    items:items.map(item=>(item.quantity||'1')+' × '+String(item.name).replace(/KennelFlow/g,'Kennel One')).join('\n'),
     shippingAddress:[
       address.address_line_1,address.address_line_2,
       [address.locality,address.administrative_district_level_1,address.postal_code].filter(Boolean).join(', '),
@@ -105,7 +105,7 @@ async function sendEmail(details){
   const apiKey=String(process.env.RESEND_API_KEY||'').trim();
   if(apiKey){
     const from=String(process.env.RESEND_FROM_EMAIL||
-      'KennelFlow Orders <onboarding@resend.dev>').trim();
+      'Kennel One Orders <onboarding@resend.dev>').trim();
     const response=await fetch('https://api.resend.com/emails',{
       method:'POST',
       headers:{Authorization:'Bearer '+apiKey,'Content-Type':'application/json'},
@@ -174,7 +174,7 @@ export function installKennelFlowOrderNotificationRoutes(app,config){
       if(config.configuredLocationID && payment.location_id!==config.configuredLocationID) return res.sendStatus(200);
 
       const order=await fetchOrder(payment.order_id,config);
-      if(cloudReady() && order?.line_items?.some(item=>item.name==='KennelFlow service payment')){
+      if(cloudReady() && order?.line_items?.some(item=>['Kennel One service payment','KennelFlow service payment'].includes(item.name))){
         const verification=await fetch(config.squareApiBase+'/v2/payments/'+encodeURIComponent(payment.id),{headers:{Authorization:'Bearer '+config.accessToken,'Square-Version':config.squareApiVersion}});
         if(!verification.ok)throw Error('Unable to independently verify completed Square payment');
         const confirmed=(await verification.json()).payment;

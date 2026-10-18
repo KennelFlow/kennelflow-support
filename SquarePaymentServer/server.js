@@ -14,8 +14,8 @@ const accessToken = process.env.SQUARE_ACCESS_TOKEN;
 const configuredLocationID = (process.env.SQUARE_LOCATION_ID || '').trim();
 const maxPaymentCents = Number.parseInt(process.env.MAX_PAYMENT_CENTS || '5000000', 10);
 const flatShippingCents = Math.max(0, Number.parseInt(process.env.STORE_FLAT_SHIPPING_CENTS || '0', 10));
-const storeOrigin = process.env.STORE_ORIGIN || 'https://kennelflowpro.app';
-const storeSuccessURL = process.env.STORE_SUCCESS_URL || 'https://kennelflowpro.app/order-success.html';
+const storeOrigin = process.env.STORE_ORIGIN || 'https://kennelone.app';
+const storeSuccessURL = process.env.STORE_SUCCESS_URL || 'https://kennelone.app/order-success.html';
 const quailFlowStoreSuccessURL = process.env.QUAILFLOW_STORE_SUCCESS_URL || 'https://quailflow.app/order-success.html';
 // QuailFlow purchases are disabled unless an operator explicitly enables them.
 const quailFlowSalesEnabled = process.env.QUAILFLOW_SALES_ENABLED === 'true';
@@ -54,7 +54,7 @@ const client = new Client({ bearerAuthCredentials: { accessToken }, environment 
 const PRODUCTS = Object.freeze({
   'dog-tag': { name: 'Smart Kennel Management Dog Tag', cents: 999 },
   'kennel-crate-tag': { name: 'Smart Kennel Management Kennel/Crate Tag', cents: 1499 },
-  'nfc-1': { name: 'KennelFlow NFC Tag', cents: 499 },
+  'nfc-1': { name: 'Kennel One NFC Tag', cents: 499 },
   'nfc-5': { name: '5-Pack NFC Tags', cents: 2299 },
   'nfc-10': { name: '10-Pack NFC Tags', cents: 3999 },
   'nfc-25': { name: '25-Pack NFC Tags', cents: 8499 },
@@ -98,7 +98,7 @@ installKennelFlowOrderNotificationRoutes(app,{
   configuredLocationID,
   squareApiBase,
   squareApiVersion,
-  stores:{ KennelFlow:PRODUCTS, QuailFlow:QUAILFLOW_PRODUCTS, RabbitFlow:RABBITFLOW_PRODUCTS }
+  stores:{ 'Kennel One':PRODUCTS, QuailFlow:QUAILFLOW_PRODUCTS, RabbitFlow:RABBITFLOW_PRODUCTS }
 });
 
 // Authenticated KennelFlow Business payment links. Never mark an invoice paid here.
@@ -141,8 +141,8 @@ app.post('/kennelflow/checkout', async (req,res)=>{
       }
     }
     const bodySquare={idempotency_key:requestID,order:{location_id:checkoutLocationID,line_items:[{
-      name:'KennelFlow service payment',quantity:'1',base_price_money:{amount:amountCents,currency:'USD'}
-    }]},payment_note:['KennelFlow Business',kennelID,customerName,description,reference].filter(Boolean).join(' • ').slice(0,500)};
+      name:'Kennel One service payment',quantity:'1',base_price_money:{amount:amountCents,currency:'USD'}
+    }]},payment_note:['Kennel One Business',kennelID,customerName,description,reference].filter(Boolean).join(' • ').slice(0,500)};
     const sq=await fetch(squareApiBase+'/v2/online-checkout/payment-links',{
       method:'POST',headers:{Authorization:'Bearer '+accessToken,'Square-Version':squareApiVersion,'Content-Type':'application/json'},body:JSON.stringify(bodySquare)
     });
@@ -193,7 +193,7 @@ app.post('/kennelflow/checkout-status',async(req,res)=>{
     const orderData=await orderRes.json();
     if(!orderRes.ok)return res.status(502).json({error:'Could not verify Square order'});
     const order=orderData?.order;
-    const valid=order?.location_id===verifiedLocationID&&Number(order?.total_money?.amount)===amountCents&&Array.isArray(order?.line_items)&&order.line_items.some(x=>x.name==='KennelFlow service payment');
+    const valid=order?.location_id===verifiedLocationID&&Number(order?.total_money?.amount)===amountCents&&Array.isArray(order?.line_items)&&order.line_items.some(x=>['Kennel One service payment','KennelFlow service payment'].includes(x.name));
     if(!valid)return res.status(409).json({error:'Square order details do not match'});
     const ids=(order.tenders||[]).map(x=>x.payment_id).filter(Boolean);
     let paid=false,paymentID='';
@@ -236,11 +236,11 @@ app.post('/kennelflow/recover-payment',async(req,res)=>{
         const orderRes=await fetch(squareApiBase+'/v2/orders/'+encodeURIComponent(payment.order_id),{headers});
         if(!orderRes.ok)continue;
         const order=(await orderRes.json()).order;
-        if(order?.location_id!==configuredLocationID||Number(order?.total_money?.amount)!==amountCents||!order.line_items?.some(x=>x.name==='KennelFlow service payment'))continue;
+        if(order?.location_id!==configuredLocationID||Number(order?.total_money?.amount)!==amountCents||!order.line_items?.some(x=>['Kennel One service payment','KennelFlow service payment'].includes(x.name)))continue;
         const combined=[payment.note||'',order.note||''].join(' • ');
         // Checkout notes contain "KennelFlow Business • <kennel UUID> • customer • description • reference".
         const parts=combined.split(' • ').map(x=>x.trim());
-        const base=parts.findIndex(x=>x==='KennelFlow Business');
+        const base=parts.findIndex(x=>['Kennel One Business','KennelFlow Business'].includes(x));
         if(base<0||parts[base+1]?.toLowerCase()!==kennelID.toLowerCase()||parts[base+parts.length-1]===undefined)continue;
         if(!parts.slice(base+2).includes(reference.trim()))continue;
         matchingCount++;
@@ -261,7 +261,7 @@ app.post('/square/create-payment', async (req, res) => {
     if (!sourceID || !locationID || !Number.isInteger(amountCents) || amountCents <= 0) return res.status(400).json({ error:'Missing or invalid payment fields.' });
     if (amountCents > maxPaymentCents) return res.status(400).json({ error:'Payment amount exceeds the configured server limit.' });
     if (configuredLocationID && locationID !== configuredLocationID) return res.status(400).json({ error:'Location ID does not match the configured Square location.' });
-    if (currency !== 'USD') return res.status(400).json({ error:'Only USD payments are enabled for this KennelFlow server.' });
+    if (currency !== 'USD') return res.status(400).json({ error:'Only USD payments are enabled for this Kennel One server.' });
     const idempotencyKey=(clientIdempotencyKey||crypto.randomUUID()).slice(0,45);
     const response=await client.paymentsApi.createPayment({ sourceId:sourceID,idempotencyKey,locationId:locationID,amountMoney:{amount:BigInt(amountCents),currency},note:[customerName,description].filter(Boolean).join(' • ').slice(0,500) });
     const payment=response.result.payment;
@@ -294,7 +294,7 @@ app.post('/store/create-checkout', async (req,res) => {
     if(flatShippingCents>0){lineItems.push({name:'Standard Shipping',quantity:'1',item_type:'ITEM',base_price_money:{amount:flatShippingCents,currency:'USD'}});}
 
     const name=[buyer.firstName,buyer.lastName].filter(Boolean).join(' ').trim();
-    const paymentNote=['KennelFlow Store',name,notes].filter(Boolean).join(' • ').slice(0,500);
+    const paymentNote=['Kennel One Store',name,notes].filter(Boolean).join(' • ').slice(0,500);
     const body={
       idempotency_key:crypto.randomUUID(),
       order:{location_id:configuredLocationID,line_items:lineItems,pricing_options:{auto_apply_taxes:true}},
