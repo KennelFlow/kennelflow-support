@@ -26,3 +26,8 @@ test('store emails require payment-based provider deduplication key',()=>{
  assert.match(document,/Idempotency-Key/);
  assert.match(document,/kennelone-store\//);
 });
+
+test('new card-charge and merchant notification settings are never enabled by the production Pages config',()=>{
+ const production=config.split('[env.production]')[1]?.split('[env.preview]')[0]||'';
+ assert.doesNotMatch(production,/ENABLE_DIRECT_CARD_PAYMENTS|ENABLE_STORE_NOTIFICATIONS|ENABLE_STORE_SMS_NOTIFICATIONS/);
+});
