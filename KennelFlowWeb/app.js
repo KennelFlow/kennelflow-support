@@ -77,7 +77,7 @@ function renderNav(){
 }
 function render(background=false){renderNav();renderOverview();renderPanel(background)}
 function renderOverview(){
-  const box=$('overview');box.replaceChildren();const intro=el('section',undefined,'intro');intro.append(el('p','ONE CONNECTED KENNEL','eyebrow'),el('h2','Your records, wherever you work'),el('p','Manage shared records here and continue in the KennelFlow app. Open devices check for updates automatically. If both devices change a record, you choose which changes to keep.'));box.append(intro);
+  const box=$('overview');box.replaceChildren();const intro=el('section',undefined,'intro');intro.append(el('p','ONE CONNECTED KENNEL','eyebrow'),el('h2','Your records, wherever you work'),el('p','Manage shared records here and continue in the Kennel One app. Open devices check for updates automatically. If both devices change a record, you choose which changes to keep.'));box.append(intro);
   const grid=el('div',undefined,'metrics');
   for(const [name,types] of visibleGroups().filter(([name])=>name!=='Overview')){const b=button('',()=>selectSection(name),'metric'),count=[...rows.values()].filter(r=>types.includes(r.type)&&!r.deleted_at).length;b.append(el('h3',name),el('strong',name==='Employees'?(['owner','admin'].includes(role)?String(teamMembers.length):'Open'):String(count)),el('span',name==='Employees'?(['owner','admin'].includes(role)?'Team members':'Time & work history'):'Shared records'));grid.append(b)}
   box.append(grid);
@@ -246,7 +246,7 @@ function renderSpecialized(type,list){
             const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),25000);
             try{
               const verified=await api('kennels/'+kennel+'/square-status',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({orderID:data.orderID,amountCents,customerName:customer.value})});
-              liveStatus.textContent=verified.paid?(verified.saved?'Payment confirmed and saved in KennelFlow.':verified.alreadyRecorded?'Payment previously recorded.':'Square confirmed payment; KennelFlow save not confirmed.'):'No completed payment yet. Status: '+(verified.status||'unknown');
+              liveStatus.textContent=verified.paid?(verified.saved?'Payment confirmed and saved in Kennel One.':verified.alreadyRecorded?'Payment previously recorded.':'Square confirmed payment; Kennel One save not confirmed.'):'No completed payment yet. Status: '+(verified.status||'unknown');
               if(verified.saved)await load(true);
             }catch(error){liveStatus.textContent=error.name==='AbortError'?'Payment verification timed out. Retry in a moment.':'Payment verification failed: '+error.message}
             finally{clearTimeout(timer);liveVerify.disabled=false;liveVerify.textContent='Verify live Square payment'}
@@ -268,7 +268,7 @@ function renderSpecialized(type,list){
         const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),30000);
         try{
           const result=await api('kennels/'+kennel+'/square-recover',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({reference:lookup,amountCents,customerName:customer.value.trim()})});
-          recoveryMessage.textContent=result.saved?'Square payment found and saved to the KennelFlow ledger.':result.alreadyRecorded?'The payment was already recorded.':'Square confirmed a matching payment, but ledger storage needs review.';
+          recoveryMessage.textContent=result.saved?'Square payment found and saved to the Kennel One ledger.':result.alreadyRecorded?'The payment was already recorded.':'Square confirmed a matching payment, but ledger storage needs review.';
           if(result.saved)await load(true);
         }catch(error){recoveryMessage.textContent=error.name==='AbortError'?'Square recovery timed out. No new charge was made.':'Could not recover payment: '+error.message}
         finally{clearTimeout(timeout);recover.disabled=false}
@@ -301,7 +301,7 @@ function renderSpecialized(type,list){
             const timeout=setTimeout(()=>controller.abort(),25000);
             try{
               const v=await api('kennels/'+kennel+'/square-sandbox-status',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({orderID:data.orderID,amountCents,customerName:customer.value})});
-              verifyResult.textContent=v.paid?(v.saved?'Square confirmed payment and saved the TEST record in KennelFlow.':v.alreadyRecorded?'Square confirmed payment; record already exists.':'Square confirmed payment, but saving the record is not confirmed.'):'No completed Square sandbox payment was found. Status: '+(v.status||'unknown');
+              verifyResult.textContent=v.paid?(v.saved?'Square confirmed payment and saved the TEST record in Kennel One.':v.alreadyRecorded?'Square confirmed payment; record already exists.':'Square confirmed payment, but saving the record is not confirmed.'):'No completed Square sandbox payment was found. Status: '+(v.status||'unknown');
               if(v.saved)await load(true);
             }catch(e){verifyResult.textContent=e.name==='AbortError'?'Verification timed out. Square or cloud is taking too long; please retry.':'Verification failed: '+e.message}
             finally{clearTimeout(timeout);check.textContent='Verify Square test payment';check.disabled=false}
@@ -344,18 +344,18 @@ function renderSpecialized(type,list){
     panel.append(field,result);
     const scanner=el('div');panel.append(scanner);stopScanner=attachScanner(scanner,value=>{input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}))});
     const writer=button('Program NFC tag',async()=>{
-      if(!('NDEFReader' in window)){message('This browser does not support Web NFC writing. Use supported Chrome on Android or the KennelFlow iPhone app.');return}
+      if(!('NDEFReader' in window)){message('This browser does not support Web NFC writing. Use supported Chrome on Android or the Kennel One iPhone app.');return}
       const value=input.value.trim();
       const match=[...rows.values()].find(r=>r.type==='smartTags'&&!r.deleted_at&&(r.id===value.toLowerCase()||tagPayload(r.record).toLowerCase()===value.toLowerCase()||r.record?.name===value));
       if(!match){message('Enter the exact tag name, record ID or QR payload for an existing assignment before programming.');return}
       const payload=tagPayload(match.record);
-      if(!confirm('Write this KennelFlow assignment onto the NFC tag you hold to this device? This will overwrite its current NDEF contents.'))return;
+      if(!confirm('Write this Kennel One assignment onto the NFC tag you hold to this device? This will overwrite its current NDEF contents.'))return;
       writer.disabled=true;
-      try{const ndef=new window.NDEFReader();await ndef.write({records:[{recordType:'text',data:payload}]});message('NFC write completed for '+recordName(match.record)+'. Scan the tag in the KennelFlow app to confirm its linked record.')}
+      try{const ndef=new window.NDEFReader();await ndef.write({records:[{recordType:'text',data:payload}]});message('NFC write completed for '+recordName(match.record)+'. Scan the tag in the Kennel One app to confirm its linked record.')}
       catch(e){message('NFC writing was not completed: '+(e?.message||'Device or tag not available'))}
       finally{writer.disabled=false}
     });
-    if(canWrite(role,type))panel.append(writer);panel.append(el('p','On iPhone, use the native KennelFlow app to program NFC. QR scanning and QR labels are available here.','muted'));host.append(panel);
+    if(canWrite(role,type))panel.append(writer);panel.append(el('p','On iPhone, use the native Kennel One app to program NFC. QR scanning and QR labels are available here.','muted'));host.append(panel);
   }
 }
 
@@ -497,12 +497,12 @@ async function mirrorCareDuties(session){
  }
 }
 function showReport(title,sections){
- const area=$('reportContent');area.replaceChildren(el('p','KENNELFLOW','eyebrow'),el('h2',title),el('p',kennels.find(k=>k.id===kennel)?.name||''),el('p','Generated '+new Date().toLocaleString(),'muted'));
+ const area=$('reportContent');area.replaceChildren(el('p','KENNEL ONE','eyebrow'),el('h2',title),el('p',kennels.find(k=>k.id===kennel)?.name||''),el('p','Generated '+new Date().toLocaleString(),'muted'));
  for(const [name,records] of sections){area.append(el('h3',human(name)));if(!records.length)area.append(el('p','No records.','muted'));for(const record of records){const block=el('dl');for(const [key,value] of Object.entries(record)){if(key==='id'||value==null||value==='')continue;block.append(el('dt',human(key)),el('dd',displayValue(value,key)))}area.append(block)}}
  $('reportDialog').showModal();
 }
-function showPedigree(title,levels){showReport(title,[]);const chart=el('div',undefined,'pedigree-chart');for(const [i,nodes] of levels.entries()){const column=el('section',undefined,'pedigree-generation');column.append(el('h3',i===0?'Dog':'Generation '+i));const members=el('div',undefined,'pedigree-members');for(const node of nodes){const box=el('div',undefined,'pedigree-dog');box.append(el('strong',node.name));if(node.record?.registrationNumber)box.append(el('small',node.record.registrationNumber));if(node.record?.registeredName&&node.record.registeredName!==node.name)box.append(el('small',node.record.registeredName));members.append(box)}column.append(members);chart.append(column)}$('reportContent').append(chart,el('p','KennelFlow · Entries come from saved dog records. Unrecorded ancestors are shown explicitly.','muted'))}
-async function showTagQR(row){try{const {qrImage}=await import('./scan-codecs.mjs');const payload=tagPayload(row.record),src=await qrImage(payload);showReport(recordName(row.record)+' · QR label',[['Assignment',[{name:row.record.name,payload,placement:row.record.placementName||row.record.locationName||''}]]]);const image=el('img');image.src=src;image.alt='QR code for '+recordName(row.record);image.width=300;image.height=300;$('reportContent').append(image);const link=el('a','Download QR image');link.href=src;link.download='KennelFlow-QR-'+row.id+'.png';$('reportContent').append(link)}catch(e){message('QR could not be generated: '+e.message)}}
+function showPedigree(title,levels){showReport(title,[]);const chart=el('div',undefined,'pedigree-chart');for(const [i,nodes] of levels.entries()){const column=el('section',undefined,'pedigree-generation');column.append(el('h3',i===0?'Dog':'Generation '+i));const members=el('div',undefined,'pedigree-members');for(const node of nodes){const box=el('div',undefined,'pedigree-dog');box.append(el('strong',node.name));if(node.record?.registrationNumber)box.append(el('small',node.record.registrationNumber));if(node.record?.registeredName&&node.record.registeredName!==node.name)box.append(el('small',node.record.registeredName));members.append(box)}column.append(members);chart.append(column)}$('reportContent').append(chart,el('p','Kennel One · Entries come from saved dog records. Unrecorded ancestors are shown explicitly.','muted'))}
+async function showTagQR(row){try{const {qrImage}=await import('./scan-codecs.mjs');const payload=tagPayload(row.record),src=await qrImage(payload);showReport(recordName(row.record)+' · QR label',[['Assignment',[{name:row.record.name,payload,placement:row.record.placementName||row.record.locationName||''}]]]);const image=el('img');image.src=src;image.alt='QR code for '+recordName(row.record);image.width=300;image.height=300;$('reportContent').append(image);const link=el('a','Download QR image');link.href=src;link.download='KennelOne-QR-'+row.id+'.png';$('reportContent').append(link)}catch(e){message('QR could not be generated: '+e.message)}}
 function attachDocument(row){const record=newRecord('DocumentRecord'),types={dogs:'DogProfile',puppies:'PuppyProfile',expenses:'ExpenseReceipt',healthRecords:'HealthRecord',contracts:'ContractFile'};record.linkedType=types[row.type]||collections[row.type];record.linkedName=row.id.toUpperCase();record.title=recordName(row.record)+' · Attachment';record.kind=row.type==='expenses'?'Receipt':row.type==='healthRecords'?'Health Record':row.type==='contracts'?'Contract':'Photo';openEditor(null,'documents',record)}
 async function replaceFile(row){
   if(!['owner','admin'].includes(role)||!['documents','scannedReports'].includes(row.type))return;
@@ -539,7 +539,7 @@ function exportVisibleRecords(){
   };
   const lines=[['recordType','revision','deletedAt',...keys].map(safe).join(','),...selected.map(r=>[r.type,r.revision,r.deleted_at||'',...keys.map(k=>r.record?.[k])].map(safe).join(','))];
   const blob=new Blob(['\\ufeff'+lines.join('\\r\\n')],{type:'text/csv;charset=utf-8'});
-  const href=URL.createObjectURL(blob),link=el('a');link.href=href;link.download='kennelflow-'+type+(deleted?'-deleted':'')+'-'+new Date().toISOString().slice(0,10)+'.csv';
+  const href=URL.createObjectURL(blob),link=el('a');link.href=href;link.download='kennelone-'+type+(deleted?'-deleted':'')+'-'+new Date().toISOString().slice(0,10)+'.csv';
   document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(href),10000);
 }
 const exportButton=button('Export CSV',exportVisibleRecords,'secondary');
