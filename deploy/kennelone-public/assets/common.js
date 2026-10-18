@@ -5,7 +5,7 @@ function header(active=''){
     <nav class="nav-links">
       <a href="features.html">Features</a><a href="smart-kennels.html">Smart Kennels</a><a href="shop.html">Store</a><a href="pricing.html">Pricing</a><a href="support.html">Support</a>
     </nav>
-    <div class="nav-actions"><a class="btn btn-secondary" href="https://app.kennelflowpro.app" rel="noopener noreferrer">Kennel One Portal</a><a class="btn btn-secondary" href="download.html">Download</a><a class="btn btn-primary" href="shop.html">Store</a></div>
+    <div class="nav-actions"><a class="btn btn-secondary" href="https://app.kennelone.app" rel="noopener noreferrer">Kennel One Portal</a><a class="btn btn-secondary" href="download.html">Download</a><a class="btn btn-primary" href="shop.html">Store</a></div>
   </div></header>`;
 }
 function footer(){

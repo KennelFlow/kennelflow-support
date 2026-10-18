@@ -1,4 +1,4 @@
-const STORE_API_BASE = 'https://kennelflow-payments.onrender.com';
+const STORE_API_BASE = 'https://payments.kennelone.app';
 
 function checkoutCart(){
   try{return JSON.parse(localStorage.getItem('kfCheckoutCart')||localStorage.getItem('kfCart')||'{}')||{}}catch{return{}}
