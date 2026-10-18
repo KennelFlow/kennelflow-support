@@ -79,7 +79,7 @@ const RABBITFLOW_PRODUCTS = Object.freeze({
 
 function cors(req,res,next){
   const origin=req.headers.origin;
-  const allowed=new Set([storeOrigin,'https://kennelflow.github.io','https://kennelflowpro.app','https://www.kennelflowpro.app','https://quailflow.app','https://www.quailflow.app','https://rabbitflow.app','https://www.rabbitflow.app','https://yardpatrol.app','https://www.yardpatrol.app']);
+  const allowed=new Set([storeOrigin,'https://kennelflow.github.io','https://kennelflowpro.app','https://www.kennelflowpro.app','https://kennelone.app','https://www.kennelone.app','https://quailflow.app','https://www.quailflow.app','https://rabbitflow.app','https://www.rabbitflow.app','https://yardpatrol.app','https://www.yardpatrol.app']);
   if(origin && allowed.has(origin)) res.setHeader('Access-Control-Allow-Origin',origin);
   res.setHeader('Vary','Origin');
   res.setHeader('Access-Control-Allow-Headers','Content-Type');
