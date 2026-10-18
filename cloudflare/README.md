@@ -58,3 +58,8 @@ The live NFC scanner branding was corrected to Kennel One separately from the ba
 
 ### Shared Square payment checkout preview
 The separate `cloudflare/payments` Pages project now contains the QuailFlow and RabbitFlow `/store/create-checkout` handlers and Yard Patrol `/yardpatrol/create-checkout`, `/yardpatrol/checkout-status`, and `/yardpatrol/cancel-checkout` equivalents. These are deliberately not wired into production. In Preview, secrets are absent, so purchase requests fail closed. Catalog prices are from trusted server-side mappings, not client cart values. The real Yard Patrol customer portal and its PostgreSQL data are still hosted on Render and require a separate migration and live-data reconciliation.
+
+### Yard Patrol customer portal Cloudflare preview
+The Cloudflare payment project includes the Yard Patrol customer portal and business inbox route handlers, modeled against the original Express routes with parameterized Neon SQL. Set encrypted Preview binding `YARDPATROL_DATABASE_URL` to the dedicated `yardpatrol_portal` database (never the main Kennel One `neondb`); use an isolated test tenant first. Public leads are limited to eight per hour per hashed request IP using the preview D1 `EVENTS` binding. For owner recovery use a fresh, random, audit-managed `YARDPATROL_OWNER_RECOVERY_KEY` secret—never reuse legacy fixed recovery tokens. No credentials have been configured; the preview intentionally fails closed.
+
+The live Yard Patrol Render database is still in service and scheduled to expire October 27, 2026. An initial exact-match Neon copy is preserved, but incremental data changes must be reconciled before final cutover. Do not retire Render until all customer portal routes and Square settlement/notifications are verified live.

@@ -105,3 +105,21 @@ The database-connection verification gate is complete. **Do not infer that end-t
 - Cloudflare preview deployed at https://payments-migration-preview.kennelone-payments.pages.dev. New checkout endpoints reject real requests without runtime Square credentials. Cloudflare staging D1 remains isolated; production Render Square is untouched.
 - **Do not cancel Render yet:** Yard Patrol also has a separate PostgreSQL-backed customer/business portal with sync, access codes, leads and customer requests (from SquarePaymentServer/yardpatrol-portal.js). This database and its routes are NOT yet migrated. QuailFlow/RabbitFlow merchant email and SMS notifications also need reliable event processing. These are additional, independently verifiable release gates, not covered merely by the checkout unit tests.
 - No credential transfer, production Square webhook rerouting or production Neon DDL was performed.
+
+## Yard Patrol portal migration staging — October 18 follow-up
+- The separate Render Yard Patrol portal database still reports expiration on October 27, 2026; its original records remain readable.
+- Existing dedicated Neon destination `yardpatrol_portal` contains the exact-matched initial copy (2 business, 1 customer portal, 0 leads). Source must be rechecked for changes before cutover.
+- Implemented Pages Functions for `/yardpatrol/portal/*`, `/yardpatrol/inbox/*`, and `/yardpatrol/leads`, covering portal sync/login/rotate/delete, requests, inbox and lead management with parameterized Neon SQL and existing access-code hashing.
+- Replaced the legacy hardcoded recovery token path with a separately configured one-time server-side `YARDPATROL_OWNER_RECOVERY_KEY` secret, intentionally unconfigured in Preview.
+- Added Cloudflare D1-backed public lead-rate-limiting table `yardpatrol_lead_limits`, verified present in isolated payment-event D1 database. The initial schema-file attempt had a transient authentication error; a direct D1 command subsequently succeeded.
+- Added PostgreSQL PGlite integration tests using only fabricated records and codes; `cloudflare/payments` has 59 passing tests. Total tests across three projects: 22 portal + 13 storefront + 59 payment/portal = 94.
+- Deployed only to https://payments-migration-preview.kennelone-payments.pages.dev. `/yardpatrol/portal/health` returns HTTP 503 intentionally because its `YARDPATROL_DATABASE_URL` secret has not been installed, so no customer writes can occur. Production Render remains active.
+
+### Still required before safe Render retirement
+1. Securely bind `YARDPATROL_DATABASE_URL` to the Neon `yardpatrol_portal` connection for Cloudflare Preview or the temporary Render backend, with allowed secret management. Do not reveal credentials in chat, shell history, Git or logs.
+2. Test the Cloudflare preview against an isolated database/tenant, then compare live copies and finalize the switch before October 27.
+3. Set `YARDPATROL_OWNER_RECOVERY_KEY` via audited credential provisioning and test one-time recovery.
+4. Run full Square-hosted Sandbox checkout, verified webhook receipt, atomic ledger, and merchant notification tests. Securely provision Square, Neon and email provider secrets in Preview. Complete QuailFlow and RabbitFlow notification, and Yard Patrol service payment parity. Only then activate production webhooks.
+5. Verify live login, file sync and cloud records for Kennel One; keep rollback until complete.
+
+This code is staged and has **not** made a production payment or customer record change.

@@ -9,3 +9,6 @@ CREATE TABLE IF NOT EXISTS payment_events (
   received_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS payment_events_status ON payment_events(status,received_at);
+
+-- Per-IP (hashed) customer inquiry throttling in Cloudflare D1.
+CREATE TABLE IF NOT EXISTS yardpatrol_lead_limits (client_hash TEXT NOT NULL, hour_bucket INTEGER NOT NULL, requests INTEGER NOT NULL, PRIMARY KEY(client_hash,hour_bucket));
