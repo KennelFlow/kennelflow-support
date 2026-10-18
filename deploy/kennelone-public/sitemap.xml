@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://kennelone.app/</loc></url>
+  <url><loc>https://kennelone.app/shop.html</loc></url>
+  <url><loc>https://kennelone.app/support.html</loc></url>
+  <url><loc>https://kennelone.app/privacy.html</loc></url>
+  <url><loc>https://kennelone.app/terms.html</loc></url>
+  <url><loc>https://kennelone.app/smart-kennels.html</loc></url>
+  <url><loc>https://kennelone.app/features.html</loc></url>
+  <url><loc>https://kennelone.app/pricing.html</loc></url>
+  <url><loc>https://kennelone.app/download.html</loc></url>
 </urlset>

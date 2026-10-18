@@ -9,7 +9,7 @@ test('independent kennelone landing exists and does not hijack legacy CNAME',()=
  assert.ok(existsSync(new URL('../deploy/kennelone-public/assets/kennelone-mountain-mist.jpg',import.meta.url)));
  const site=read('deploy/kennelone-public/index.html');
  assert.match(site,/<title>Kennel One/);
- assert.match(site,/noindex,nofollow/);
+ assert.match(site,/index,follow/);
  assert.match(site,/https:\/\/app\.kennelflowpro\.app/);
  assert.match(site,/https:\/\/apps\.apple\.com\/us\/app\/id6809212861/);
  assert.doesNotMatch(site,/https:\/\/app\.kennelone\.app/);
@@ -40,25 +40,36 @@ test('public website support link stays consistent with live Kennel One support 
 });
 
 
-test('new branded public paths safely hand off to current working sites',()=>{
- const cases={
-   'shop.html':'https://kennelflowpro.app/shop.html',
-   'support.html':'https://kennelflowpro.app/support.html',
-   'checkout.html':'https://kennelflowpro.app/checkout.html',
-   'app.html':'https://app.kennelflowpro.app/',
-   'privacy.html':'https://kennelflowpro.app/privacy.html',
-   'terms.html':'https://kennelflowpro.app/terms.html',
- };
- for(const [path,destination] of Object.entries(cases)){
-   const html=read('deploy/kennelone-public/'+path);
-   assert.match(html,/<title>[^<]+Kennel One<\/title>/);
-   assert.ok(html.includes('window.location.replace('+JSON.stringify(destination).replaceAll('"',"'")+')'),path+' preserves working destination');
-   assert.ok(html.includes('href="'+destination+'"'),path+' includes accessible backup');
-   assert.doesNotMatch(html,/javascript:|https?:\/\/app\.kennelone\.app/);
+test('Kennel One public pages render locally and keep checkout and portal operational',()=>{
+ const localPaths=['shop.html','support.html','checkout.html','privacy.html','terms.html','smart-kennels.html','features.html','pricing.html','download.html','order-success.html'];
+ for(const path of localPaths){
+  const page=read('deploy/kennelone-public/'+path);
+  assert.match(page,/<title>[^<]+/);
+  assert.doesNotMatch(page,/http-equiv="refresh"|window\.location\.replace\(/);
+  assert.ok(page.includes('https://kennelone.app/'+path),path+' canonical points to new domain');
  }
+ const app=read('deploy/kennelone-public/app.html');
+ assert.match(app,/https:\/\/app\.kennelflowpro\.app/);
+ assert.ok(app.includes('window.location.replace'), 'existing signed-in portal unchanged');
  const home=read('deploy/kennelone-public/index.html');
- for(const path of ['/shop.html','/support.html','/privacy.html','/terms.html']){
-   assert.ok(home.includes('href="'+path+'"'),'landing links '+path);
- }
- assert.equal(read('deploy/kennelone-public/robots.txt'),'User-agent: *\nDisallow: /\n');
+ for(const path of ['/shop.html','/support.html','/privacy.html','/terms.html']) assert.ok(home.includes('href="'+path+'"'));
+ assert.match(read('deploy/kennelone-public/robots.txt'),/Allow: \//);
+});
+test('new on-domain Kennel One store preserves exact products and Square checkout wiring',()=>{
+ const base='deploy/kennelone-public/';
+ const shop=read(base+'shop.html');
+ const ids=Array.from(shop.matchAll(/data-add="([^"]+)"/g),m=>m[1]);
+ assert.deepEqual(ids,['dog-tag','kennel-crate-tag','nfc-1','nfc-5','nfc-10','nfc-25','holder-kit','holder-5','facility-kit']);
+ const prices=Array.from(shop.matchAll(/<div class="price">(\$[^<]+)<\/div>/g),m=>m[1]);
+ assert.deepEqual(prices,['$9.99','$14.99','$4.99','$22.99','$39.99','$84.99','$14.99','$69.99','$134.99']);
+ const srcs=Array.from(shop.matchAll(/<img[^>]+src="([^"]+)"/g),m=>m[1]);
+ assert.equal(srcs.length,9);
+ for(const src of srcs) assert.ok(existsSync(new URL('../'+base+src,import.meta.url)),src);
+ for(const file of ['assets/common.js','assets/site.js','assets/checkout.js','assets/styles.css']) assert.ok(existsSync(new URL('../'+base+file,import.meta.url)),file);
+ const storeJs=read(base+'assets/site.js');
+ const checkoutJs=read(base+'assets/checkout.js');
+ assert.match(storeJs,/localStorage\.setItem\('kfCheckoutCart'/);
+ assert.match(storeJs,/window\.location\.href='checkout\.html'/);
+ assert.match(checkoutJs,/https:\/\/kennelflow-payments\.onrender\.com/);
+ assert.match(checkoutJs,/store\/create-checkout/);
 });
