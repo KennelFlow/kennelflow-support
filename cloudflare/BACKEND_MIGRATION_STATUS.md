@@ -56,3 +56,10 @@ Do not shut off or delete Render yet. Until these gates pass, the working live c
 - Tests: Portal 16, storefront 13, payments 35 (including real local PostgreSQL). Run all three suites and check live sites/Render before any production change.
 
 **Remaining release gates:** secure sandbox Square credentials in Cloudflare Preview, verified Neon test-branch schema and function, real Sandbox Square hosted checkout + signed webhook and ledger exactly-once test, email/SMS delivery including other stores, app login and records using disposable tenant, managed production payment secret transfer and webhook URL cutover with rollback. Other apps' routes (QuailFlow, RabbitFlow, Yard Patrol) still require parity before any Render deletion.
+
+
+## Production payment availability observation
+- During post-migration read-only checks on October 18, 2026, the production Render Square `/health` endpoint timed out after 20 seconds on one request; the immediate retry completed in under one second with `ok:true`, `environment:production`, and `webhookConfigured:true`. Render event history did not show a server failure. This is consistent with, but does not prove, a free-instance cold start.
+- Until direct Square checkout is live and verified, first-visit purchases may experience the remaining Render wait. **Do not stop Render or remove the existing Square webhook URL.**
+- The staging payment preview `/health` confirmed D1 event storage connected, all payment credentials absent, and settlement disabled. Zero real or synthetic payment-event rows were stored remotely.
+- Latest tests on October 18: portal 16, public-store checkout 13, payments 35 = 64 passed. Changes saved in the `kennelone-cloudflare-migration` GitHub branch. Production was not switched.
