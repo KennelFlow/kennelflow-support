@@ -42,3 +42,10 @@ The public checkout's direct Square integration is feature-gated behind `SQUARE_
 The separate `cloudflare/payments` project contains an HMAC-verifying Square webhook staging implementation, D1 event schema, and mock tests. Deploy to a **preview** only; it is deliberately not an active webhook receiver for completed payments because downstream settlement/notification is not ported. Webhook preview requires `SQUARE_WEBHOOK_SIGNATURE_KEY`, `SQUARE_WEBHOOK_URL` (exact subscription URL), `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID`, `SQUARE_ENVIRONMENT`, and a D1 `EVENTS` binding. A 503 on an unsettled webhook is **intentional**; activating this endpoint for production would not be acceptable.
 
 Local checks: `cd cloudflare/public && npm test`, `cd cloudflare/payments && npm test`, `cd cloudflare/portal && npm test`. Production payment checkout routes and legacy app webhooks remain on Render.
+
+### Atomic payment settlement and order notifications (staging)
+`cloudflare/payments/db/settle-service-payment-v1.sql` is a **not-applied** PostgreSQL function for the existing Kennel One Square checkouts ledger. It locks the pending checkout, validates amounts and payment identities, creates deterministic payment records and marks the checkout completed within one PostgreSQL transaction. Test only against a disposable branch. It requires the Cloudflare payment Function's encrypted `DATABASE_URL` secret and a matching backend schema.
+
+Merchant order-email notifications are available via Resend only when `ENABLE_STORE_NOTIFICATIONS=true` and encrypted `RESEND_API_KEY`, `ORDER_NOTIFICATION_EMAIL` and `RESEND_FROM_EMAIL` are set. No notification or customer email is sent unless Square's completion is independently confirmed. Production remains disabled; SMS and other stores still require migration.
+
+**No production cutover is authorized by the existence of the code.** The live Square webhook is still on Render. Do not set production payment environment secrets or enable webhook routes before testing with isolated Square Sandbox plus matching Neon database.

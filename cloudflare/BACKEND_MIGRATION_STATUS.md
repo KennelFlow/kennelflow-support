@@ -45,3 +45,14 @@ Do not shut off or delete Render yet. Until these gates pass, the working live c
 2. Implement/verify atomic ledger settlement in Neon and idempotent webhook notifications for all stores and apps; validate full payment workflow including receipt delivery.
 3. Run genuine test-account (not owner/customer production) login, cloud read/write/upload and staff access against the D1-powered portal preview.
 4. After an audited side-by-side comparison and controlled DNS/webhook transition, switch production with rollback and recheck all apps; only then remove Render services and close the account.
+
+## Latest tested settlement and notifications stage — October 18, 2026
+- Cloudflare payments staging now has an explicit, disabled-by-default Neon service-ledger gate, a tested PostgreSQL function `cloudflare/payments/db/settle-service-payment-v1.sql`, and a server-only Neon HTTP adapter. **Do not apply SQL to any production database before matching its current schema and testing in an isolated Neon branch.**
+- Local PostgreSQL WASM integration tests ran the actual function with disposable test records. Verified: one inserted ledger row, exact replay idempotency, payment-ID conflict, amount mismatch, canceled checkout, missing checkout, duplicate-record integrity and sandbox/production separation.
+- Webhook integration tests now exercise signed synthetic Square events through payment verification to real local PostgreSQL settlement, then D1 event state. All test credentials are synthetic.
+- Optional merchant email notifications use Resend server-side and a per-payment idempotency key. The dispatch function is enabled only by `ENABLE_STORE_NOTIFICATIONS=true`; this is **off in production**. Requests with an uncertain notification age greater than 23 hours fail closed for manual reconciliation rather than risking emails after Resend's 24-hour idempotency window.
+- A separate health endpoint reports configuration booleans, never secret values: https://payments-migration-preview.kennelone-payments.pages.dev/health. It verified preview event storage connected and all payment credentials/feature gates disabled.
+- Connected Neon workspace could not be positively verified as the one used by the production backend, so **no remote Neon SQL or branch changes were made**.
+- Tests: Portal 16, storefront 13, payments 35 (including real local PostgreSQL). Run all three suites and check live sites/Render before any production change.
+
+**Remaining release gates:** secure sandbox Square credentials in Cloudflare Preview, verified Neon test-branch schema and function, real Sandbox Square hosted checkout + signed webhook and ledger exactly-once test, email/SMS delivery including other stores, app login and records using disposable tenant, managed production payment secret transfer and webhook URL cutover with rollback. Other apps' routes (QuailFlow, RabbitFlow, Yard Patrol) still require parity before any Render deletion.
