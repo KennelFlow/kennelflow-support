@@ -82,3 +82,17 @@ Do not shut off or delete Render yet. Until these gates pass, the working live c
 - Other applications still share Render's Square backend. QuailFlow, RabbitFlow and Yard Patrol checkout/status/webhook endpoints require full migration and testing before turning that service off.
 - Production signed Square webhooks and email/SMS receipts must pass end-to-end Sandbox tests with the correct provider configuration before replacing production endpoint URLs.
 - Therefore **do not close the Render account or shut down its portal, Square production or sandbox services** yet. Frontends on Cloudflare already work; replacing an active backend without the missing credentials would interrupt logins or real payments.
+
+
+## Verified production Neon database connection (2026-10-18, read-only)
+**STATUS: VERIFIED. The earlier connection-identity blocker is resolved.** No production database writes were performed.
+
+- Live Render `kennelflow-web` deployed branch `kennelflow-web-readonly` hard-codes the Neon API endpoint for branch `br-long-night-b5uhw0hi`. The Cloudflare portal direct API uses the same endpoint.
+- The connected Neon account's primary/default branch has **exactly** `br-long-night-b5uhw0hi`, and database `neondb`. `/v2/capabilities` responded HTTP 200 with 46 collections and payments support.
+- The Render production Square server's `KENNELFLOW_SQUARE_DATABASE_URL` specifies endpoint `ep-sparkling-breeze-b5k3sscf-pooler.c-7.us-east-2.aws.neon.tech/neondb`. The connected Neon project reports endpoint `ep-sparkling-breeze-b5k3sscf` attached to the exact same production branch. Database credentials were never printed or saved, and the dashboard was remasked after inspection.
+- The Square server also has a **separate** `DATABASE_URL` for Yard Patrol; it is unrelated to the Kennel One Neon payment ledger and must not be used for its migration.
+- Read-only Neon SQL confirms 12 public tables, including `app_users`, `kennels`, `kennel_memberships`, `kennel_records`, and `kennelflow_square_checkouts`.
+- Baseline record counts: 1 business, 1 account, 1 membership, 287 kennel records (283 active and 4 soft-deleted), 1 active `payments` type ledger record, and 0 `kennelflow_square_checkouts` rows. The latter is not a count of all Square charges; it is a specific business-checkout tracking table.
+- Confirmed production column names and data types for both `kennel_records` and `kennelflow_square_checkouts` match the expected source schema. No private customer data was extracted, and no SQL DDL was applied.
+
+The database-connection verification gate is complete. **Do not infer that end-to-end payment migration is complete.** Real Cloudflare login, record synchronization, Square Sandbox webhook settlement, notification delivery, shared-app parity, and rollback validation are still necessary before turning Render off.
