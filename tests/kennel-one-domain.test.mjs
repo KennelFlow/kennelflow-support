@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync,existsSync} from 'node:fs';
+import {readFileSync,existsSync,readdirSync} from 'node:fs';
 const read = path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 
 test('independent kennelone landing exists and does not hijack legacy CNAME',()=>{
@@ -10,9 +10,9 @@ test('independent kennelone landing exists and does not hijack legacy CNAME',()=
  const site=read('deploy/kennelone-public/index.html');
  assert.match(site,/<title>Kennel One/);
  assert.match(site,/index,follow/);
- assert.match(site,/https:\/\/app\.kennelflowpro\.app/);
+ assert.match(site,/https:\/\/app\.kennelone\.app/);
  assert.match(site,/https:\/\/apps\.apple\.com\/us\/app\/id6809212861/);
- assert.doesNotMatch(site,/https:\/\/app\.kennelone\.app/);
+ assert.doesNotMatch(site,/https:\/\/app\.kennelflowpro\.app/);
  assert.doesNotMatch(site,/Google Play|Android/);
 });
 test('staged domain plan preserves old domains and requires verified TLS',()=>{
@@ -49,8 +49,8 @@ test('Kennel One public pages render locally and keep checkout and portal operat
   assert.ok(page.includes('https://kennelone.app/'+path),path+' canonical points to new domain');
  }
  const app=read('deploy/kennelone-public/app.html');
- assert.match(app,/https:\/\/app\.kennelflowpro\.app/);
- assert.ok(app.includes('window.location.replace'), 'existing signed-in portal unchanged');
+ assert.match(app,/https:\/\/app\.kennelone\.app/);
+ assert.ok(app.includes('window.location.replace'), 'existing signed-in portal routes to branded domain');
  const home=read('deploy/kennelone-public/index.html');
  for(const path of ['/shop.html','/support.html','/privacy.html','/terms.html']) assert.ok(home.includes('href="'+path+'"'));
  assert.match(read('deploy/kennelone-public/robots.txt'),/Allow: \//);
@@ -70,6 +70,22 @@ test('new on-domain Kennel One store preserves exact products and Square checkou
  const checkoutJs=read(base+'assets/checkout.js');
  assert.match(storeJs,/localStorage\.setItem\('kfCheckoutCart'/);
  assert.match(storeJs,/window\.location\.href='checkout\.html'/);
- assert.match(checkoutJs,/https:\/\/kennelflow-payments\.onrender\.com/);
+ assert.match(checkoutJs,/https:\/\/payments\.kennelone\.app/);
  assert.match(checkoutJs,/store\/create-checkout/);
+});
+
+
+test('Kennel One published pages and scripts contain no public legacy branding',()=>{
+
+ const base=new URL('../deploy/kennelone-public/',import.meta.url);
+ function check(dir){
+  for(const entry of readdirSync(dir,{withFileTypes:true})){
+   const target=new URL(entry.name+(entry.isDirectory()?'/':''),dir);
+   if(entry.isDirectory()){check(target);continue;}
+   if(!/\.(html|js|css|xml|txt)$/.test(entry.name))continue;
+   const body=readFileSync(target,'utf8');
+   assert.doesNotMatch(body,/KennelFlow|kennelflowpro\.app/i,entry.name+' retains legacy public branding');
+  }
+ }
+ check(base);
 });
