@@ -1,0 +1,15 @@
+# Existing project settings downloaded and reviewed before adding a D1 preview binding.
+name = "kennelone-portal"
+compatibility_date = "2026-10-18"
+pages_build_output_dir = "./public"
+
+# Production has no new session binding until login and payment migration are verified.
+[env.production]
+
+# Preview-only durable sessions; this has no effect on the live app.kennelone.app domain.
+[env.preview]
+
+[[env.preview.d1_databases]]
+binding = "SESSIONS"
+database_name = "kennelone-session-vault"
+database_id = "7e74bf76-9f70-483e-b547-5e73304462aa"
