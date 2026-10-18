@@ -16,10 +16,15 @@ test('Yard Patrol creates Square hosted link with exact amount and invoice',asyn
  assert.equal(outgoing.payload.checkout_options.allow_tipping,false);
 });
 test('status is paid only when exact invoice, amount and location match Square',async()=>{
- const ok=async()=>Response.json({order:{id:'order-22',state:'COMPLETED',location_id:'square-test-location',total_money:{amount:2350},
-  line_items:[{name:'Yard Patrol Pet Waste Removal — Invoice #22'}],tenders:[{payment_id:'pay-22'}]}});
+ const ok=async(url)=>{
+  if(url.includes('/v2/orders/'))return Response.json({order:{id:'order-22',state:'OPEN',location_id:'square-test-location',total_money:{amount:2350},
+   line_items:[{name:'Yard Patrol Pet Waste Removal — Invoice #22'}],tenders:[{payment_id:'pay-22'}]}});
+  if(url.includes('/v2/payments/'))return Response.json({payment:{id:'pay-22',order_id:'order-22',status:'COMPLETED',
+   location_id:'square-test-location',amount_money:{amount:2350,currency:'USD'}}});
+  throw Error('Unexpected Square endpoint');
+ };
  const r=await verifyYardPatrolCheckout({...details,orderID:'order-22'},env,ok);
- assert.equal(r.paid,true);assert.equal(r.paymentID,'pay-22');
+ assert.equal(r.paid,true);assert.equal(r.status,'COMPLETED');assert.equal(r.paymentID,'pay-22');
  const bad=async()=>Response.json({order:{state:'COMPLETED',location_id:'elsewhere',total_money:{amount:2350}}});
  await assert.rejects(()=>verifyYardPatrolCheckout({...details,orderID:'order-22'},env,bad),{status:400});
 });
@@ -56,4 +61,33 @@ test('Yard Patrol Square checkout permits authentic checkout.square.site long UR
   payment_link:{long_url:'https://checkout.square.site/EXAMPLE',order_id:'order-22',id:'checkout-22'}
  }));
  assert.equal(ans.url,'https://checkout.square.site/EXAMPLE');
+});
+
+test('OPEN Square order without a payment tender must not be reported paid',async()=>{
+ const r=await verifyYardPatrolCheckout({...details,orderID:'order-22'},env,async()=>Response.json({order:{
+  id:'order-22',state:'OPEN',location_id:'square-test-location',
+  total_money:{amount:2350},line_items:[{name:'Yard Patrol Pet Waste Removal — Invoice #22'}],
+  tenders:[]
+ }}));
+ assert.equal(r.paid,false);assert.equal(r.paymentID,'');
+});
+test('OPEN order with tender requires independently completed Square payment',async()=>{
+ const status=async(u)=>u.includes('/orders/')?Response.json({order:{
+  id:'order-22',state:'OPEN',location_id:'square-test-location',total_money:{amount:2350},
+  line_items:[{name:'Yard Patrol Pet Waste Removal — Invoice #22'}],tenders:[{payment_id:'pay-22'}]
+ }}):Response.json({payment:{id:'pay-22',order_id:'order-22',status:'PENDING',
+ location_id:'square-test-location',amount_money:{amount:2350,currency:'USD'}}});
+ const r=await verifyYardPatrolCheckout({...details,orderID:'order-22'},env,status);
+ assert.equal(r.paid,false);assert.equal(r.status,'PENDING');
+});
+test('tender that points to different order or amount is rejected',async()=>{
+ for(const replacement of [{order_id:'attacker-order'},{amount_money:{amount:1,currency:'USD'}},
+    {location_id:'some-other-merchant'}]){
+  const fetcher=async u=>u.includes('/orders/')?Response.json({order:{
+   id:'order-22',state:'OPEN',location_id:'square-test-location',total_money:{amount:2350},
+   line_items:[{name:'Yard Patrol Pet Waste Removal — Invoice #22'}],tenders:[{payment_id:'pay-22'}]
+  }}):Response.json({payment:{id:'pay-22',order_id:'order-22',status:'COMPLETED',
+   location_id:'square-test-location',amount_money:{amount:2350,currency:'USD'},...replacement}});
+  await assert.rejects(()=>verifyYardPatrolCheckout({...details,orderID:'order-22'},env,fetcher),{status:502});
+ }
 });

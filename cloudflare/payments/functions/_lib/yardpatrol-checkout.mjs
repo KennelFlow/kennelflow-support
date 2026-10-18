@@ -47,9 +47,22 @@ export async function verifyYardPatrolCheckout(data,env,fetcher=fetch){
  const label='Yard Patrol Pet Waste Removal — Invoice #'+invoiceNumber;
  if(Number(order.total_money?.amount)!==expectedAmountCents||!order.line_items?.some(x=>x?.name===label))
   throw failure(400,'Square order does not match this invoice');
- const paid=order.state==='COMPLETED';
- const tender=order.tenders?.find(x=>x?.payment_id);
- return {paid,status:order.state||'OPEN',orderID,paymentID:String(tender?.payment_id||'')};
+ // Square Checkout Sandbox can keep the order state OPEN even after a paid
+ // tender is attached. Never infer payment from Order.state alone.
+ const tender=Array.isArray(order.tenders)?order.tenders.find(x=>typeof x?.payment_id==='string'&&x.payment_id.length>0):null;
+ const paymentID=tender?.payment_id||'';
+ if(!paymentID)return {paid:false,status:order.state||'OPEN',orderID,paymentID:''};
+ if(paymentID.length>192)throw failure(502,'Square payment ID is invalid');
+ const paymentResponse=await fetcher(host+'/v2/payments/'+encodeURIComponent(paymentID),{
+  headers:sqHeaders(env),redirect:'manual'
+ });
+ if(!paymentResponse.ok)throw failure(503,'Unable to verify payment with Square');
+ const payment=(await paymentResponse.json().catch(()=>({}))).payment;
+ if(!payment||payment.id!==paymentID||payment.order_id!==orderID||
+    payment.location_id!==env.SQUARE_LOCATION_ID||
+    payment.amount_money?.currency!=='USD'||Number(payment.amount_money?.amount)!==expectedAmountCents)
+   throw failure(502,'Square payment identity, location or amount mismatch');
+ return {paid:payment.status==='COMPLETED',status:payment.status||'UNKNOWN',orderID,paymentID};
 }
 export async function cancelYardPatrolCheckout(data,env,fetcher=fetch){
  const checkoutID=text(data?.checkoutID,193),orderID=text(data?.orderID,193);
