@@ -64,3 +64,13 @@ test('returned checkout URL is restricted to legitimate Square-owned destination
  await assert.rejects(()=>buildSharedCheckout('rabbitflow',{items:[{id:'rf-nfc-1',quantity:1}],buyer},env,
    async()=>Response.json({payment_link:{url:'https://attacker.example/charge',order_id:'x'}})),{status:502});
 });
+
+test('accepts verified Square long-form checkout URL and not lookalike domain',async()=>{
+ const details={items:[{id:'rf-nfc-1',quantity:1}],buyer:{email:'test@example.test'}};
+ const cfg={SQUARE_ENVIRONMENT:'sandbox',SQUARE_LOCATION_ID:'test-location',SQUARE_ACCESS_TOKEN:'mock'};
+ const ok=await buildSharedCheckout('rabbitflow',details,cfg,
+   async()=>Response.json({payment_link:{long_url:'https://checkout.square.site/EXAMPLE',order_id:'test-order'}}));
+ assert.equal(ok.url,'https://checkout.square.site/EXAMPLE');
+ await assert.rejects(()=>buildSharedCheckout('rabbitflow',details,cfg,
+   async()=>Response.json({payment_link:{url:'https://checkout.square.site.evil.example/EXAMPLE'}})),{status:502});
+});

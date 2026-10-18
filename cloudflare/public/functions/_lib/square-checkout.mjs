@@ -61,7 +61,7 @@ export async function createSquareCheckout(payload,env,fetcher=fetch) {
   if(!response.ok)throw error(data?.errors?.[0]?.detail||data?.errors?.[0]?.code||'Square checkout could not be created.',502);
   const url=data?.payment_link?.url||data?.payment_link?.long_url;
   let parsed;try{parsed=new URL(url)}catch{throw error('Square returned an invalid checkout link',502)}
-  if(parsed.protocol!=='https:'||!parsed.hostname.endsWith('.square.link')&&!['square.link','squareup.com','sandbox.square.link'].includes(parsed.hostname)&&!parsed.hostname.endsWith('.squareup.com')&&
+  if(parsed.protocol!=='https:'||!parsed.hostname.endsWith('.square.link')&&!['square.link','checkout.square.site','squareup.com','sandbox.square.link'].includes(parsed.hostname)&&!parsed.hostname.endsWith('.squareup.com')&&
     !parsed.hostname.endsWith('.squareupsandbox.com'))throw error('Square returned an unexpected checkout domain',502);
   return {url,orderID:data?.payment_link?.order_id||'',shippingCents:configuredShipping};
 }

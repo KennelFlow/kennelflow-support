@@ -50,3 +50,10 @@ test('Yard Patrol Cross-Origin request denied; valid checkout is allowed',async(
  assert.equal(ok.status,200);
  assert.equal(ok.headers.get('access-control-allow-origin'),'https://yardpatrol.app');
 });
+
+test('Yard Patrol Square checkout permits authentic checkout.square.site long URL',async()=>{
+ const ans=await createYardPatrolCheckout(details,env,async()=>Response.json({
+  payment_link:{long_url:'https://checkout.square.site/EXAMPLE',order_id:'order-22',id:'checkout-22'}
+ }));
+ assert.equal(ans.url,'https://checkout.square.site/EXAMPLE');
+});

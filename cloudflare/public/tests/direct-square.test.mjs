@@ -61,3 +61,11 @@ test('reject non-Square payment link despite successful Square API response',asy
  await assert.rejects(()=>createSquareCheckout({items:[{id:'nfc-1',quantity:1}],buyer},env,
   async()=>Response.json({payment_link:{url:'https://evil.example/charge',order_id:'fake'}})),{status:502});
 });
+
+test('Square payment links can safely fall back to official long checkout URL',async()=>{
+ const p={items:[{id:'nfc-1',quantity:1}],buyer};
+ const ans=await createSquareCheckout(p,env,async()=>Response.json({
+  payment_link:{long_url:'https://checkout.square.site/EXAMPLE',order_id:'order-1'}
+ }));
+ assert.equal(ans.url,'https://checkout.square.site/EXAMPLE');
+});

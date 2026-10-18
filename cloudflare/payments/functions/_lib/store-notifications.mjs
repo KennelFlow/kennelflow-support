@@ -77,3 +77,74 @@ export async function notifyKennelOneStore(verified,env={},fetcher=fetch) {
   if(typeof data.id!=='string'||!data.id)throw Error('Email provider did not acknowledge receipt');
   return {sent:true,provider:'resend',messageID:data.id};
 }
+
+// Shared merchant email handling for known QuailFlow and RabbitFlow orders.
+// Existing Kennel One emails retain their approved layout and provider key.
+import {catalogs} from './shared-store.mjs';
+const sharedCatalog=Object.freeze({
+  QuailFlow:new Set(Object.values(catalogs.quailflow).map(x=>x.name)),
+  RabbitFlow:new Set(Object.values(catalogs.rabbitflow).map(x=>x.name))
+});
+export function sharedStoreDetails(verified){
+ const store=verified?.storeName;
+ if(verified?.type!=='store-order'||!Object.hasOwn(sharedCatalog,store))return null;
+ const p=verified.payment,o=verified.order,note=String(p?.note||'');
+ if(!note.startsWith(store+' Store'))return null;
+ if(!Array.isArray(o?.line_items))return null;
+ const lines=o.line_items.filter(x=>sharedCatalog[store].has(String(x?.name||'')));
+ if(!lines.length)return null;
+ const cents=Number(p.amount_money?.amount);
+ if(!Number.isSafeInteger(cents)||cents<100||cents>5000000)return null;
+ const recipient=(o.fulfillments||[]).map(x=>x?.shipment_details?.recipient).find(Boolean)||{};
+ const address=recipient.address||{};
+ const ship=[address.address_line_1,address.address_line_2,
+   [address.locality,address.administrative_district_level_1,address.postal_code].filter(Boolean).join(', '),
+   address.country].filter(Boolean).join('\n');
+ return {
+   storeName:store,paymentID:p.id,orderID:o.id,amount:cents,
+   customerName:String(recipient.display_name||note.split(' • ')[1]||'Customer').slice(0,120),
+   email:String(p.buyer_email_address||'See Square order').slice(0,254),
+   phone:String(recipient.phone_number||'See Square order').slice(0,50),
+   items:lines.map(x=>String(x.quantity||'1')+' × '+String(x.name)).join('\n'),
+   shipping:ship||'View Square order for shipping address',
+   notes:note.split(' • ').slice(2).join(' • ').slice(0,350)
+ };
+}
+export async function notifyVerifiedStore(verified,env={},fetcher=fetch){
+ if(verified?.storeName==='Kennel One')return notifyKennelOneStore(verified,env,fetcher);
+ const info=sharedStoreDetails(verified);
+ if(!info)throw Error('Unrecognized store order');
+ const apiKey=env.RESEND_API_KEY,to=env.ORDER_NOTIFICATION_EMAIL,from=env.RESEND_FROM_EMAIL;
+ if(!apiKey||!from||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to||''))
+   throw Error('Merchant order email is not configured');
+ const prefix=info.storeName==='QuailFlow'?'quailflow':'rabbitflow';
+ const idempotency='kennelone-'+prefix+'-store/'+info.paymentID;
+ if(idempotency.length>256)throw Error('Invalid idempotency key');
+ const subject=info.storeName+' New Order — '+money(info.amount);
+ const plain=[
+  info.storeName.toUpperCase()+' NEW STORE ORDER','Total: '+money(info.amount),
+  'Customer: '+info.customerName,'Email: '+info.email,'Phone: '+info.phone,
+  'Items:',info.items,'Shipping:',info.shipping,
+  ...(info.notes?['Order notes: '+info.notes]:[]),
+  'Square Order: '+info.orderID
+ ].join('\n');
+ const html='<section style="font-family:Arial,sans-serif;max-width:620px">'+
+  '<h2>'+esc(info.storeName)+' New Store Order</h2>'+
+  '<p><strong>Total:</strong> '+esc(money(info.amount))+'</p>'+
+  '<p><strong>Customer:</strong> '+esc(info.customerName)+'</p>'+
+  '<p><strong>Email:</strong> '+esc(info.email)+'</p>'+
+  '<p><strong>Phone:</strong> '+esc(info.phone)+'</p>'+
+  '<h3>Items</h3><pre>'+esc(info.items)+'</pre>'+
+  '<h3>Shipping</h3><pre>'+esc(info.shipping)+'</pre>'+
+  (info.notes?'<p><strong>Notes:</strong> '+esc(info.notes)+'</p>':'')+
+  '<p>Square Order: '+esc(info.orderID)+'</p></section>';
+ const response=await fetcher('https://api.resend.com/emails',{
+  method:'POST',redirect:'manual',signal:AbortSignal.timeout(15000),
+  headers:{Authorization:'Bearer '+apiKey,'Content-Type':'application/json','Idempotency-Key':idempotency},
+  body:JSON.stringify({from,to:[to],subject,text:plain,html})
+ });
+ if(!response.ok)throw Error('Merchant email delivery failed ('+response.status+')');
+ const sent=await response.json().catch(()=>({}));
+ if(!sent?.id)throw Error('Email provider did not acknowledge delivery request');
+ return {sent:true,provider:'resend',messageID:sent.id,storeName:info.storeName};
+}

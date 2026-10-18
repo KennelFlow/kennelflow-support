@@ -12,3 +12,14 @@ CREATE INDEX IF NOT EXISTS payment_events_status ON payment_events(status,receiv
 
 -- Per-IP (hashed) customer inquiry throttling in Cloudflare D1.
 CREATE TABLE IF NOT EXISTS yardpatrol_lead_limits (client_hash TEXT NOT NULL, hour_bucket INTEGER NOT NULL, requests INTEGER NOT NULL, PRIMARY KEY(client_hash,hour_bucket));
+
+-- SMS duplicates suppressed durably; ambiguous CLAIMED status requires reconciliation.
+CREATE TABLE IF NOT EXISTS notification_deliveries (
+ payment_id TEXT NOT NULL,
+ channel TEXT NOT NULL CHECK (channel IN ('sms')),
+ status TEXT NOT NULL CHECK (status IN ('CLAIMED','SENT')),
+ provider_message_id TEXT,
+ created_at INTEGER NOT NULL,
+ updated_at INTEGER,
+ PRIMARY KEY(payment_id,channel)
+);

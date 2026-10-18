@@ -61,7 +61,7 @@ export async function buildSharedCheckout(store,body,env,fetcher=fetch){
  if(!response.ok)throw fail(502,'Square checkout failed');
  const link=(await response.json().catch(()=>({}))).payment_link||{};
  let url;try{url=new URL(link.url||link.long_url)}catch{throw fail(502,'Invalid Square URL')}
- if(url.protocol!=='https:'||!(url.hostname==='square.link'||url.hostname.endsWith('.square.link')||url.hostname.endsWith('.squareup.com')||url.hostname.endsWith('.squareupsandbox.com')))throw fail(502,'Unexpected Square URL');
+ if(url.protocol!=='https:'||!(url.hostname==='square.link'||url.hostname==='checkout.square.site'||url.hostname.endsWith('.square.link')||url.hostname.endsWith('.squareup.com')||url.hostname.endsWith('.squareupsandbox.com')))throw fail(502,'Unexpected Square URL');
  return {url:url.href,orderID:link.order_id||'',shippingCents:shipping};
 }
 const reply=(data,status,origin)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store','Vary':'Origin',...(origin?{'Access-Control-Allow-Origin':origin}:{})}});

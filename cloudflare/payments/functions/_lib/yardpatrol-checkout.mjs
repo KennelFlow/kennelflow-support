@@ -11,7 +11,7 @@ const invoice=value=>Number.isSafeInteger(value)&&value>0;
 const text=(value,max)=>typeof value==='string'?value.trim().slice(0,max):'';
 const squareLink=link=>{
  let url;try{url=new URL(link?.url||link?.long_url)}catch{throw failure(502,'Invalid Square checkout URL')}
- if(url.protocol!=='https:'||!(url.hostname==='square.link'||url.hostname.endsWith('.square.link')||url.hostname.endsWith('.squareup.com')||url.hostname.endsWith('.squareupsandbox.com')))throw failure(502,'Unexpected Square checkout URL');
+ if(url.protocol!=='https:'||!(url.hostname==='square.link'||url.hostname==='checkout.square.site'||url.hostname.endsWith('.square.link')||url.hostname.endsWith('.squareup.com')||url.hostname.endsWith('.squareupsandbox.com')))throw failure(502,'Unexpected Square checkout URL');
  return url.href;
 };
 export async function createYardPatrolCheckout(data,env,fetcher=fetch){

@@ -123,3 +123,19 @@ The database-connection verification gate is complete. **Do not infer that end-t
 5. Verify live login, file sync and cloud records for Kennel One; keep rollback until complete.
 
 This code is staged and has **not** made a production payment or customer record change.
+
+## Latest Square routing and notifications hardening (October 18, 2026)
+- Live Render payments and customer portal remain in service; all changes below are on isolated Cloudflare **Preview**, not production.
+- Explicit Square-verified order attribution separates Kennel One kennel-service payments, Kennel One retail, QuailFlow retail, RabbitFlow retail, and unrelated merchant payments. Unrelated successfully verified Square events are acknowledged as ignored, rather than creating false store notifications or repeated webhook failures.
+- QuailFlow and RabbitFlow merchant email notifications are now in staging with trusted item names, store attribution, escaped HTML, and Square-payment-specific Resend idempotency keys. Previously approved Kennel One receipt layout remains unchanged.
+- Merchant SMS via Twilio is now in staging for all three stores. Cloudflare D1 stores one unique `notification_deliveries` claim per payment/channel to stop duplicate messages across concurrent webhooks and retry attempts. If Twilio outcome is uncertain, no second automatic text is sent; it requires manual delivery reconciliation. **Do not enable production SMS until dry-run, provider credential and reconciliation tests pass.**
+- Confirmed through Square's API reference that CreatePaymentLink may return `square.link` and `checkout.square.site` payment links. Added the exact official long URL hostname to the allowed checkout domains for Kennel One, QuailFlow, RabbitFlow, Yard Patrol; malicious lookalike domains are still blocked.
+- Staging D1 database `kennelone-payment-events` was updated to include `notification_deliveries` and all three expected tables were verified present: `payment_events`, `yardpatrol_lead_limits`, `notification_deliveries`.
+- Updated Cloudflare Pages preview URLs: `https://payments-migration-preview.kennelone-payments.pages.dev` and `https://direct-square-preview.kennelone-public.pages.dev`. The staged payment system still reports all Square and settlement credentials absent/disabled by design. Yard Patrol /portal/health returns HTTP 503 before its Neon secret is installed, with no production database changes.
+- Test suites currently: 22 Cloudflare portal, 14 public store, 74 payment project = **110 passing tests**. This is not a real Square Sandbox charge/settlement or customer-login test.
+
+### Outstanding live service changes (not performed)
+1. Install the dedicated Neon `yardpatrol_portal` connection string securely as Cloudflare Preview `YARDPATROL_DATABASE_URL`, run authenticated portal parity tests against isolated test rows, reconcile live Render database deltas, then perform a controlled customer cutover *before October 27, 2026*.
+2. Securely install Square Sandbox and webhook signature keys into Cloudflare Preview, trigger a real no-charge Sandbox transaction, reconcile signed webhook, Neon settlement, Resend email, Twilio SMS, and store payment history against each source. Never test by charging production cards.
+3. Verify the remaining production Kennel One login/cloud records, other-store payment and notifications, checkout and webhook parity, recovery and rollback across all apps before moving production URLs and removing Render.
+4. Never attempt to transfer provider credentials through chat text, GitHub, logs, or unsecured shell output. Existing connector attempts to set secrets were blocked; use authorized provider secret settings or Work browser with authenticated accounts.

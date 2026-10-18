@@ -7,7 +7,7 @@ globalThis.atob||=(str)=>Buffer.from(str,'base64').toString('binary');
 const url='https://preview-payment.example/square/webhook',secret='a-synthetic-key-never-used-in-production';
 const env={SQUARE_WEBHOOK_URL:url,SQUARE_WEBHOOK_SIGNATURE_KEY:secret,
   SQUARE_ACCESS_TOKEN:'fake-test-token',SQUARE_LOCATION_ID:'test-location',SQUARE_ENVIRONMENT:'sandbox'};
-const basePayment={id:'test-payment',status:'COMPLETED',order_id:'test-order',location_id:'test-location'};
+const basePayment={id:'test-payment',status:'COMPLETED',order_id:'test-order',location_id:'test-location',note:'Kennel One Store • Test Customer'};
 let baseEvent={type:'payment.updated',event_id:'evt-123',data:{object:{payment:basePayment}}};
 const signed=(event=baseEvent,key=secret)=>{const body=JSON.stringify(event);
  const signature=createHmac('sha256',key).update(url+body).digest('base64');
@@ -138,4 +138,15 @@ test('old uncertain notifications fail closed after provider idempotency protect
  assert.equal(result.status,503);
  assert.match((await result.json()).error,/manual reconciliation/);
  assert.equal(sent,0);
+});
+
+
+test('signed unrelated Square payment is ignored without retry or D1 bookkeeping',async()=>{
+ const events=db();
+ const unknown=async target=>target.includes('/v2/payments/')?
+   Response.json({payment:{...basePayment,note:'Unrelated merchant order',amount_money:{amount:499}}}):
+   Response.json({order:{id:'test-order',location_id:'test-location',total_money:{amount:499},line_items:[{name:'Unknown SKU'}]}});
+ const r=await processWebhook(signed(),{...env,EVENTS:events},unknown);
+ assert.equal(r.status,200);assert.equal((await r.json()).ignored,true);
+ assert.equal(events.rows.size,0);
 });

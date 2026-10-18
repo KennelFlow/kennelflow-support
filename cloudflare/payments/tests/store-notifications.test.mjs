@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {notifyKennelOneStore,kennelOneStoreDetails} from '../functions/_lib/store-notifications.mjs';
+import {notifyKennelOneStore,kennelOneStoreDetails,sharedStoreDetails,notifyVerifiedStore} from '../functions/_lib/store-notifications.mjs';
 const verification={
  type:'store-order',
  payment:{id:'test-payment-unique',amount_money:{amount:499,currency:'USD'},
@@ -48,4 +48,38 @@ test('legacy Square Kennel One single-tag order label is still recognized',()=>{
  const order=kennelOneStoreDetails(old);
  assert(order);
  assert.match(order.items,/Kennel One-Compatible NFC Tag/);
+});
+
+
+test('QuailFlow merchant notifications preserve store attribution and send exact Square-verified items',async()=>{
+ const p={...verification,
+  storeName:'QuailFlow',payment:{...verification.payment,note:'QuailFlow Store • Buyer'},
+  order:{...verification.order,line_items:[{name:'5 Quail + Embedded NFC',quantity:'1'}]}};
+ assert.equal(sharedStoreDetails(p).storeName,'QuailFlow');
+ let outgoing;
+ const sent=await notifyVerifiedStore(p,env,async(u,opts)=>{
+  outgoing={url:u,headers:opts.headers,body:JSON.parse(opts.body)};
+  return Response.json({id:'test-email-quailflow'});
+ });
+ assert.equal(sent.storeName,'QuailFlow');
+ assert.match(outgoing.body.subject,/QuailFlow New Order/);
+ assert.match(outgoing.body.text,/5 Quail \+ Embedded NFC/);
+ assert.match(outgoing.headers['Idempotency-Key'],/quailflow-store\/test-payment-unique/);
+});
+test('RabbitFlow merchant notifications use isolated idempotency key and HTML escaping',async()=>{
+ const p={...verification,
+  storeName:'RabbitFlow',payment:{...verification.payment,note:'RabbitFlow Store • <b>Buyer</b>'},
+  order:{...verification.order,line_items:[{name:'25 Rabbits + Embedded NFC',quantity:'1'}]}};
+ let payload;
+ await notifyVerifiedStore(p,env,async(u,opts)=>{payload=JSON.parse(opts.body);return Response.json({id:'test-email-rabbitflow'})});
+ assert.match(payload.html,/&lt;b&gt;Buyer&lt;\/b&gt;/);
+ assert.match(payload.text,/25 Rabbits \+ Embedded NFC/);
+});
+test('misattributed store orders never trigger merchant mail',async()=>{
+ const p={...verification,
+  storeName:'RabbitFlow',payment:{...verification.payment,note:'QuailFlow Store • Customer'},
+  order:{...verification.order,line_items:[{name:'5 Rabbits + Embedded NFC',quantity:'1'}]}};
+ let count=0;
+ await assert.rejects(()=>notifyVerifiedStore(p,env,async()=>{count++;return Response.json({id:'should-not-send'})}),/Unrecognized store/);
+ assert.equal(count,0);
 });

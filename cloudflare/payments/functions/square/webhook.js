@@ -1,4 +1,6 @@
-import {notifyKennelOneStore} from '../_lib/store-notifications.mjs';
+import {notifyMerchantOnceSMS} from '../_lib/store-sms.mjs';
+import {classifyVerifiedOrder} from '../_lib/order-classification.mjs';
+import {notifyVerifiedStore} from '../_lib/store-notifications.mjs';
 import {settleVerifiedServicePayment} from '../_lib/settlement.mjs';
 // Kennel One Cloudflare Square webhook — staging only.
 // No production Square webhook should target this endpoint until atomic
@@ -35,10 +37,9 @@ async function checkPayment(payment,env,fetcher){
  if(!order||order.id!==payment.order_id||order.location_id!==location||
    !Number.isSafeInteger(amount)||amount<=0||Number(order.total_money?.amount)!==amount)
   throw Error('Square order amount mismatch');
- const service=order.line_items?.some(x=>['Kennel One service payment','KennelFlow service payment'].includes(x.name));
- return {payment:confirmed,order,type:service?'kennel-service':'store-order'};
+ return {payment:confirmed,order,...classifyVerifiedOrder(order,confirmed)};
 }
-export async function processWebhook(request,env={},fetcher=fetch,settler=settleVerifiedServicePayment,notifier=notifyKennelOneStore){
+export async function processWebhook(request,env={},fetcher=fetch,settler=settleVerifiedServicePayment,notifier=notifyVerifiedStore,sms=notifyMerchantOnceSMS){
  if(request.method!=='POST')return json({error:'Method not allowed'},405);
  const secret=env.SQUARE_WEBHOOK_SIGNATURE_KEY,notificationURL=env.SQUARE_WEBHOOK_URL;
  if(!secret||!notificationURL)return json({error:'Square webhook not configured'},503);
@@ -56,6 +57,7 @@ export async function processWebhook(request,env={},fetcher=fetch,settler=settle
  let verified;
  try{verified=await checkPayment(payment,env,fetcher)}
  catch{return json({error:'Square verification temporarily unavailable'},503)}
+ if(verified.type==='unrelated')return json({ok:true,ignored:true});
  if(!env.EVENTS)return json({error:'Durable payment event storage not configured'},503);
  let existing;
  try{
@@ -76,9 +78,8 @@ export async function processWebhook(request,env={},fetcher=fetch,settler=settle
    if(!Number.isSafeInteger(existing.received_at)||elapsed<0||elapsed>=23*60*60*1000)
      return json({error:'Store notification requires manual reconciliation'},503);
    try {
-     if(env.ENABLE_STORE_SMS_NOTIFICATIONS==='true')
-       throw Error('SMS migration not yet complete');
      await notifier(verified,env);
+     if(env.ENABLE_STORE_SMS_NOTIFICATIONS==='true')await sms(verified,env);
      const result=await env.EVENTS.prepare("UPDATE payment_events SET status='SETTLED' WHERE payment_id=? AND order_id=? AND kind='store-order' AND status='VERIFIED_PENDING'")
        .bind(payment.id,verified.order.id).run();
      if(result?.success!==true)throw Error('Could not save notification outcome');
