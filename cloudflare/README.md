@@ -55,3 +55,6 @@ Merchant order-email notifications are available via Resend only when `ENABLE_ST
 The direct Cloudflare portal API now includes signup, password updates, business-profile edits, and authorized private messages in addition to records, employees, invitations and D1 sessions. These were verified with regression tests and a Preview deploy. Only Preview is bound to the new `SESSIONS` D1 database; production continues through the existing legacy API bridge pending real-account end-to-end tests and Square cutover.
 
 The live NFC scanner branding was corrected to Kennel One separately from the backend change; existing protocol identifiers are compatibility-critical and must not be renamed without an NFC/data migration plan.
+
+### Shared Square payment checkout preview
+The separate `cloudflare/payments` Pages project now contains the QuailFlow and RabbitFlow `/store/create-checkout` handlers and Yard Patrol `/yardpatrol/create-checkout`, `/yardpatrol/checkout-status`, and `/yardpatrol/cancel-checkout` equivalents. These are deliberately not wired into production. In Preview, secrets are absent, so purchase requests fail closed. Catalog prices are from trusted server-side mappings, not client cart values. The real Yard Patrol customer portal and its PostgreSQL data are still hosted on Render and require a separate migration and live-data reconciliation.

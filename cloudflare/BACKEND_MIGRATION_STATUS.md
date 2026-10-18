@@ -96,3 +96,12 @@ Do not shut off or delete Render yet. Until these gates pass, the working live c
 - Confirmed production column names and data types for both `kennel_records` and `kennelflow_square_checkouts` match the expected source schema. No private customer data was extracted, and no SQL DDL was applied.
 
 The database-connection verification gate is complete. **Do not infer that end-to-end payment migration is complete.** Real Cloudflare login, record synchronization, Square Sandbox webhook settlement, notification delivery, shared-app parity, and rollback validation are still necessary before turning Render off.
+
+## Cross-app payment checkout staging — October 18 continuation
+- The Cloudflare payment preview now contains server-priced Square-hosted link handlers for QuailFlow and RabbitFlow. QuailFlow preserves its disabled-by-default sales gate; product SKUs, names, cents, shipping configuration, and redirect URLs match the existing Render checkout service.
+- Added Yard Patrol Square checkout creation, invoice-verified payment status and Square checkout cancellation in Cloudflare staging, using independent amount/order/location verification and origin validation.
+- Added existing Kennel One single NFC item-name alias to merchant-order notification recognition so previously created Square orders remain identifiable after any future migration.
+- Added unit/integration regression tests for all three app checkout routes. Latest totals: payment staging 50 tests; portal 22; public storefront 13 = **85 automated tests**.
+- Cloudflare preview deployed at https://payments-migration-preview.kennelone-payments.pages.dev. New checkout endpoints reject real requests without runtime Square credentials. Cloudflare staging D1 remains isolated; production Render Square is untouched.
+- **Do not cancel Render yet:** Yard Patrol also has a separate PostgreSQL-backed customer/business portal with sync, access codes, leads and customer requests (from SquarePaymentServer/yardpatrol-portal.js). This database and its routes are NOT yet migrated. QuailFlow/RabbitFlow merchant email and SMS notifications also need reliable event processing. These are additional, independently verifiable release gates, not covered merely by the checkout unit tests.
+- No credential transfer, production Square webhook rerouting or production Neon DDL was performed.

@@ -4,7 +4,7 @@
 // later deliveries after successful processing.
 const PRODUCTS=new Set([
   'Smart Kennel Management Dog Tag','Smart Kennel Management Kennel/Crate Tag',
-  'Kennel One NFC Tag','5-Pack NFC Tags','10-Pack NFC Tags','25-Pack NFC Tags',
+  'Kennel One NFC Tag','Kennel One-Compatible NFC Tag','5-Pack NFC Tags','10-Pack NFC Tags','25-Pack NFC Tags',
   'NFC Tag + Kennel Holder','5-Kennel Smart Holder Set','10-Kennel Smart Facility Kit'
 ]);
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({

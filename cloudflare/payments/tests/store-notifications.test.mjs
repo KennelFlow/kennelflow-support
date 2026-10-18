@@ -43,3 +43,9 @@ test('foreign store orders are excluded from Kennel One merchant email',async()=
  assert.equal(kennelOneStoreDetails(other),null);
  await assert.rejects(()=>notifyKennelOneStore(other,env),/Not a Kennel One store purchase/);
 });
+test('legacy Square Kennel One single-tag order label is still recognized',()=>{
+ const old={...verification,order:{...verification.order,line_items:[{name:'Kennel One-Compatible NFC Tag',quantity:'1'}]}};
+ const order=kennelOneStoreDetails(old);
+ assert(order);
+ assert.match(order.items,/Kennel One-Compatible NFC Tag/);
+});
