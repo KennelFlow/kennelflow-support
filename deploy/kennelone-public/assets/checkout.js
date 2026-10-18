@@ -1,4 +1,5 @@
-const STORE_API_BASE = 'https://payments.kennelone.app';
+// Same-origin Cloudflare Pages Function forwards orders to the existing Square service.
+const STORE_API_BASE = '';
 
 function checkoutCart(){
   try{return JSON.parse(localStorage.getItem('kfCheckoutCart')||localStorage.getItem('kfCart')||'{}')||{}}catch{return{}}

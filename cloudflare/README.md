@@ -4,9 +4,9 @@
 Do not switch customer-facing DNS before Cloudflare Pages previews load correctly and an owner-verified end-to-end test of login, record saves, Square payment callbacks, customer records, and legacy redirects. Existing production services must remain live for rollback.
 
 ## Public marketing website (static, no backend)
-Source: `deploy/kennelone-public` in this repo.
+Source: `deploy/kennelone-public` in this repo, with a same-origin Square checkout proxy in `cloudflare/public/functions`.
 Create a Cloudflare Pages project `kennelone-public` via Git integration or Wrangler direct upload, then use:
-`npx wrangler pages deploy deploy/kennelone-public --project-name kennelone-public --branch=main`
+`cd cloudflare/public && npx wrangler pages deploy ../../deploy/kennelone-public --project-name kennelone-public --branch=main`
 Verify all pages: /, /shop.html, /support.html, /privacy.html, /terms.html, /checkout.html.
 When verified, add `kennelone.app` and `www.kennelone.app` custom domains in Pages. Apex requires Cloudflare zone activation, with Namecheap NS changes and preservation of all current DNS and email records.
 
@@ -18,7 +18,11 @@ The Pages Function bridges same-origin /api requests to the current Render backe
 ## Payments
 Square and its production webhook remain on Render until independently migrated and verified against a sandbox. Preserve the existing Square callback URLs and secret keys; do not change customer checkout routes prematurely.
 
+The public storefront sends POST /store/create-checkout to a Cloudflare Pages Function on its own origin. That Function delegates to the existing Square payment service (no card numbers are processed here). Do not disable payments.kennelone.app until Square production and sandbox are moved and audited.
+
 ## Local checks
 `cd cloudflare/portal && npm test`
 `npx wrangler pages dev public` (local preview; verify /api same-origin behavior).
 Do not commit environment secrets or access tokens.
+
+`cd cloudflare/public && npm test`
