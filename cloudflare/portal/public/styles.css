@@ -7,3 +7,91 @@
 .specialized-panel video{display:block;width:min(100%,640px);border-radius:12px;margin:12px 0}#reportContent img{max-width:100%;height:auto;image-rendering:pixelated}#reportContent>a{display:block;margin:12px 0}
 
 #reportDialog:has(.pedigree-chart){width:min(1400px,98vw)}.pedigree-chart{display:grid;grid-template-columns:repeat(6,minmax(120px,1fr));min-width:1050px;gap:8px;overflow:visible}.pedigree-generation{display:flex;flex-direction:column}.pedigree-generation>h3{font-size:12px;margin-bottom:10px}.pedigree-members{display:flex;flex:1;flex-direction:column;justify-content:space-around;gap:4px}.pedigree-dog{border:1px solid var(--line);border-left:3px solid var(--green);border-radius:5px;padding:5px;font-size:10px;overflow-wrap:anywhere;min-height:30px}.pedigree-dog small{display:block;font-size:8px}#reportDialog .card{overflow:auto}@media print{.pedigree-chart{min-width:0;gap:3px}.pedigree-dog{font-size:8px;min-height:22px;padding:3px}.pedigree-generation>h3{font-size:9px}}
+
+
+/* Kennel One corporate management design — presentation only; API and record flows unchanged */
+:root{
+  --green:#205744;
+  --line:#dbe2df;
+  --muted:#596c68;
+  color:#1a292b;
+  background:#f5f7f6;
+}
+body{background:#f5f7f6;color:#1b2a2c}
+header{background:#192c30;border-bottom:1px solid #34494b;padding-top:14px;padding-bottom:14px}
+header .brand{font-weight:770;letter-spacing:-.75px}
+header .brand span{color:#b9cec6}
+main{max-width:1510px;margin:28px auto}
+h1,h2,h3{color:#1c3031;letter-spacing:-.55px}
+h1{font-size:30px}
+h2{font-size:24px}
+button{border-radius:7px;font-weight:650}
+button:hover:not(:disabled){filter:none}
+button:focus-visible{outline:3px solid #629685;outline-offset:3px}
+.card{border-color:var(--line);border-radius:9px;box-shadow:0 2px 8px rgba(19,44,40,.025)}
+.workspace-head{padding:8px 0 22px;margin-bottom:22px;border-bottom:1px solid var(--line)}
+.workspace-head h1{font-size:31px;margin:7px 0}
+.workspace-head .eyebrow{color:#5d7470}
+.workspace-head .toolbar button{border-radius:7px}
+.layout{grid-template-columns:238px minmax(0,1fr);gap:26px}
+nav{top:24px;background:white;border:1px solid var(--line);border-radius:9px;padding:13px 10px;gap:1px;box-shadow:0 2px 8px rgba(19,44,40,.025)}
+nav .nav-heading{font-size:10px;font-weight:800;letter-spacing:1.45px;color:#71817d;padding:13px 13px 15px}
+nav button{color:#3f5956;font-size:12.5px;padding:11px 13px;line-height:1.32;border-radius:6px;border-left:3px solid transparent;font-weight:560}
+nav button:hover:not(:disabled){background:#f0f5f2;color:#183b31}
+nav button.active{color:#194e3b;background:#e7f0e9;border-left-color:#24744e;font-weight:770}
+.content{min-width:0}
+.corporate-intro{background:linear-gradient(112deg,#192f33 0%,#234a47 100%);border:1px solid #315451;border-radius:9px;padding:35px 37px;margin-bottom:30px;box-shadow:0 5px 18px rgba(14,47,44,.07)}
+.corporate-intro .intro-content{max-width:780px}
+.corporate-intro .eyebrow{color:#b6d2c5;font-size:10px;font-weight:800;letter-spacing:2.1px;margin-bottom:14px}
+.corporate-intro h2{color:#fff;font-size:clamp(27px,3.2vw,38px);letter-spacing:-1.3px;line-height:1.16;margin:0 0 15px;font-weight:730}
+.corporate-intro p:last-child{font-size:14.5px;line-height:1.78;color:#d5e3df;margin:0}
+.module-section-header{display:flex;align-items:end;justify-content:space-between;gap:18px;margin:0 0 18px}
+.module-section-header .eyebrow{font-size:10px;font-weight:780;letter-spacing:1.6px;color:#637a73;margin-bottom:6px}
+.module-section-header h2{margin:0;font-size:22px;font-weight:760}
+.module-section-header>.muted{max-width:300px;text-align:right;margin:0 0 4px;line-height:1.5}
+.metrics{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+button.metric{min-width:0;display:flex;flex-direction:column;min-height:198px;padding:19px 19px 16px;text-align:left;background:#fff;color:#203333;border:1px solid #d9e2de;border-radius:9px;box-shadow:0 2px 8px rgba(22,50,44,.02);transition:box-shadow .14s ease,border-color .14s ease,transform .14s ease}
+button.metric:hover:not(:disabled){border-color:#9ab8a9;box-shadow:0 7px 22px rgba(26,56,49,.09);transform:translateY(-2px)}
+.metric-upper{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.metric-index{font-size:11px;letter-spacing:1.1px;color:#80908b;font-weight:800;font-variant-numeric:tabular-nums}
+.metric-open{font-size:9px;font-weight:800;letter-spacing:.8px;color:#2d6952;white-space:nowrap}
+button.metric h3{font-size:16px;font-weight:760;color:#233636;line-height:1.35;margin:0 0 7px;letter-spacing:-.3px}
+button.metric .metric-description{font-size:12px;line-height:1.5;color:#61736d;flex:1;margin:0 0 15px}
+.metric-footer{border-top:1px solid #e4eae7;display:flex;align-items:center;justify-content:space-between;padding-top:12px;gap:10px;width:100%}
+.metric-footer .metric-number{font-size:24px;line-height:1;color:#205744;font-weight:730;font-variant-numeric:tabular-nums}
+.metric-footer>span{font-size:10px;text-transform:uppercase;letter-spacing:.65px;font-weight:700;color:#81928c}
+.overview-empty{margin-top:18px;padding:17px 20px;font-size:13px;color:#4c6661}
+#recordsPanel .section-head{border-bottom:1px solid var(--line);padding-bottom:15px}
+#recordsPanel .section-head h2{font-size:23px}
+#recordsPanel .filters{border-top:0;margin-top:4px}
+#employeesPanel,#recordsPanel{box-shadow:0 2px 8px rgba(19,44,40,.025)}
+.record{border-radius:8px}
+@media(max-width:1120px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:950px){
+ .layout{grid-template-columns:1fr}
+ nav{position:static;display:flex;flex-direction:row;align-items:center;overflow-x:auto;padding:8px;gap:3px}
+ nav .nav-heading{display:none}
+ nav button{border-left:0;border-bottom:2px solid transparent;white-space:nowrap;padding:11px 12px}
+ nav button.active{border-left-color:transparent;border-bottom-color:#24744e}
+ .module-section-header>.muted{text-align:left}
+}
+@media(max-width:600px){
+ main{margin-top:18px}
+ .workspace-head{gap:12px}
+ .workspace-head h1{font-size:26px}
+ .corporate-intro{padding:25px 20px;margin-bottom:24px}
+ .corporate-intro h2{font-size:27px}
+ .corporate-intro p:last-child{font-size:13px}
+ .module-section-header{align-items:start;flex-direction:column;gap:6px}
+ .module-section-header h2{font-size:20px}
+ .metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+ button.metric{padding:14px 12px;min-height:207px}
+ button.metric h3{font-size:14px}
+ button.metric .metric-description{font-size:11px}
+ .metric-open{font-size:8px}
+ .metric-footer .metric-number{font-size:21px}
+ .metric-footer>span{font-size:9px}
+}
+@media(max-width:370px){.metrics{grid-template-columns:1fr}button.metric{min-height:162px}}
+@media(prefers-reduced-motion:reduce){button.metric{transition:none}button.metric:hover{transform:none}}
+@media print{nav{display:none!important}.corporate-intro{background:#fff;color:#111;border:1px solid #ddd}.corporate-intro h2,.corporate-intro p:last-child{color:#111}}

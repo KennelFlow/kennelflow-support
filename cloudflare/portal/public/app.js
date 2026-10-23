@@ -6,7 +6,51 @@ import {catalog,breedColors,breedCoats} from './catalog.mjs';
 import {models,collections,canRead,canWrite,newRecord,normalizedRow,recordName,compareDisplayRecords,validateModel,isoDate,uuid} from './records.mjs';
 const $=id=>document.getElementById(id);
 const labels={dogs:'Dogs',puppies:'Puppies',litters:'Litters',breedingRecords:'Breeding records',healthRecords:'Health records',puppyMedicalRecords:'Puppy medical records',customers:'Puppy buyers',clients:'Clients',tasks:'Tasks',training:'Training',equipment:'Equipment',kennels:'Kennels / areas',documents:'Photos & documents',contracts:'Contracts',payments:'Payments',groomingRecords:'Grooming',feedingPlans:'Feeding plans',supplementRecords:'Supplements',semenRecords:'Semen records',scanFolders:'Report folders',scannedReports:'Scanned reports',boardingRecords:'Boarding',calendarEvents:'Calendar events',employeeActivity:'Employee activity',staffTimeEntries:'Staff time entries',kennelCareSessions:'Kennel care',expenses:'Expenses',dailyDutyShifts:'Duty categories',dailyDutyTemplates:'Duty templates',dailyDutyRecords:'Duty records',smartTags:'QR / NFC assignments',inventoryLocations:'Inventory locations',inventoryItems:'Inventory items',travelManifests:'Travel manifests',inventoryScans:'Inventory scans',inventoryReports:'Inventory reports',smartPlacements:'Tag placements',maintenanceRecords:'Maintenance records',ofaXrays:'OFA / X-ray records',clinics:'Veterinary clinics',vetServices:'Veterinary services',employeeProfiles:'Employee profiles',messages:'Messages',locations:'Employee locations',pedigreeAncestors:'Pedigree ancestors',pedigreeScans:'Pedigree scans'};
-const groups={Overview:[],'Dogs':['dogs'],'Puppies & Litters':['puppies','litters'],'Breeding':['breedingRecords','semenRecords'],'Kennels & Care':['kennels','kennelCareSessions','equipment','maintenanceRecords'],'Clients & Boarding':['clients','boardingRecords','customers'],'Health':['healthRecords','puppyMedicalRecords','ofaXrays','clinics','vetServices'],'Grooming':['groomingRecords'],'Feeding & Supplements':['feedingPlans','supplementRecords'],'Daily Duties':['dailyDutyRecords','dailyDutyTemplates','dailyDutyShifts'],'Calendar':['calendarEvents','tasks'],'Training':['training'],'Equipment & Inventory':['equipment','inventoryItems','inventoryLocations'],'Expenses & Payments':['expenses','payments'],'Contracts':['contracts'],'Photos & Documents':['documents','scannedReports','scanFolders'],'QR / NFC':['smartTags','smartPlacements'],'Travel & Reports':['travelManifests','inventoryScans','inventoryReports','pedigreeAncestors','pedigreeScans'],'Staff Records':['employeeActivity','staffTimeEntries','employeeProfiles','messages','locations'],'Employees':[]};
+const groups={
+  Overview:[],
+  'Dog Records':['dogs'],
+  'Puppy & Litter Records':['puppies','litters'],
+  'Breeding Management':['breedingRecords','semenRecords'],
+  'Kennel Operations':['kennels','kennelCareSessions'],
+  'Client & Boarding Management':['clients','boardingRecords','customers'],
+  'Health Records':['healthRecords','puppyMedicalRecords','ofaXrays','clinics','vetServices'],
+  'Grooming Records':['groomingRecords'],
+  'Nutrition & Supplements':['feedingPlans','supplementRecords'],
+  'Daily Operations':['dailyDutyRecords','dailyDutyTemplates','dailyDutyShifts'],
+  'Scheduling':['calendarEvents','tasks'],
+  'Training Management':['training'],
+  'Maintenance Management':['maintenanceRecords'],
+  'Equipment & Inventory':['equipment','inventoryItems','inventoryLocations'],
+  'Financial Records':['expenses','payments'],
+  'Contracts & Agreements':['contracts'],
+  'Documents & Media':['documents','scannedReports','scanFolders'],
+  'Smart Tag Management':['smartTags','smartPlacements'],
+  'Travel & Reporting':['travelManifests','inventoryScans','inventoryReports','pedigreeAncestors','pedigreeScans'],
+  'Staff Management':['employeeActivity','staffTimeEntries','employeeProfiles','messages','locations'],
+  'Employee Management':[]
+};
+const moduleDescriptions={
+  'Dog Records':'Profiles, registrations, ownership and individual dog histories.',
+  'Puppy & Litter Records':'Litter planning, puppy profiles and development records.',
+  'Breeding Management':'Breeding history, pairing records and semen inventory.',
+  'Kennel Operations':'Kennel assignments, facility activity and care sessions.',
+  'Client & Boarding Management':'Customer information, reservations and boarding histories.',
+  'Health Records':'Veterinary information, vaccinations and medical documentation.',
+  'Grooming Records':'Grooming services, visits and treatment records.',
+  'Nutrition & Supplements':'Feeding plans, supplements and dietary instructions.',
+  'Daily Operations':'Shift categories, duty assignments and completion records.',
+  Scheduling:'Events, scheduled tasks and operational reminders.',
+  'Training Management':'Training plans, progress and performance records.',
+  'Maintenance Management':'Repairs, equipment conditions and maintenance history.',
+  'Equipment & Inventory':'Facility assets, inventory locations and stock details.',
+  'Financial Records':'Business expenses, payment entries and transaction records.',
+  'Contracts & Agreements':'Saved contracts and associated business documents.',
+  'Documents & Media':'Photos, digital files and scanned paperwork.',
+  'Smart Tag Management':'QR and NFC assignments, placements and scan records.',
+  'Travel & Reporting':'Travel manifests, reports and pedigree documentation.',
+  'Staff Management':'Team activities, time entries and internal work records.',
+  'Employee Management':'Team members, authorized access and invitations.'
+};
 const referenceTypes={puppyID:['puppies'],litterID:['litters'],linkedLitterID:['litters'],linkedDogID:['dogs'],linkedPuppyID:['puppies'],dogID:['dogs'],kennelID:['kennels'],areaID:['kennels','inventoryLocations'],vehicleAreaID:['inventoryLocations'],placementID:['smartPlacements'],clientID:['clients'],templateID:['dailyDutyTemplates'],folderID:['scanFolders'],tagID:['smartTags'],containerTagID:['smartTags'],tripID:['travelManifests'],itemID:['inventoryItems']};
 let teamMembers=[];
 let rows=new Map(),identity=null,kennels=[],kennel='',role='',active='Overview',loading=false,loadSequence=0,editor=null,saving=false;
@@ -67,24 +111,57 @@ async function load(silent=false){
   }catch(e){if(sequence===loadSequence){setConnection(e.status===401?'Sign in again':'Connection interrupted');if(!silent||e.status===401)message(e.message);if(e.status===401)requireLogin()}}
   finally{if(sequence===loadSequence){loading=false;$('refresh').disabled=false}}
 }
-function visibleGroups(){return Object.entries(groups).filter(([name,types])=>name==='Overview'||name==='Employees'&&!!role||types.some(t=>canRead(role,t)))}
-function selectSection(name){if(name!=='QR / NFC'){stopScanner?.();stopScanner=null}active=name;selectedDay='';renderNav();renderPanel()}
+function visibleGroups(){return Object.entries(groups).filter(([name,types])=>name==='Overview'||name==='Employee Management'&&!!role||types.some(t=>canRead(role,t)))}
+function selectSection(name){if(name!=='Smart Tag Management'){stopScanner?.();stopScanner=null}active=name;selectedDay='';renderNav();renderPanel()}
 function chooseCollection(type){const group=Object.entries(groups).find(([,types])=>types.includes(type));if(!group||!canRead(role,type))return;active=group[0];renderNav();renderPanel();$('collection').value=type;renderList()}
 function renderNav(){
-  $('nav').replaceChildren();
+  const menu=$('nav');menu.replaceChildren();
   if(!visibleGroups().some(([name])=>name===active))active='Overview';
-  for(const [name] of visibleGroups()){const b=button(name,()=>selectSection(name),'');b.classList.toggle('active',name===active);b.setAttribute('aria-current',name===active?'page':'false');$('nav').append(b)}
+  menu.append(el('div','MANAGEMENT SECTIONS','nav-heading'));
+  for(const [name] of visibleGroups()){
+    const b=button(name,()=>selectSection(name),'');
+    b.classList.toggle('active',name===active);
+    b.setAttribute('aria-current',name===active?'page':'false');
+    b.setAttribute('title',moduleDescriptions[name]||'Operations overview');
+    menu.append(b);
+  }
 }
 function render(background=false){renderNav();renderOverview();renderPanel(background)}
 function renderOverview(){
-  const box=$('overview');box.replaceChildren();const intro=el('section',undefined,'intro');intro.append(el('p','ONE CONNECTED KENNEL','eyebrow'),el('h2','Your records, wherever you work'),el('p','Manage shared records here and continue in the Kennel One app. Open devices check for updates automatically. If both devices change a record, you choose which changes to keep.'));box.append(intro);
+  const box=$('overview');box.replaceChildren();
+  const intro=el('section',undefined,'intro corporate-intro');
+  const introContent=el('div',undefined,'intro-content');
+  introContent.append(
+    el('p','KENNEL MANAGEMENT PLATFORM','eyebrow'),
+    el('h2','Centralized Kennel Operations'),
+    el('p','Manage records, staff activity, and day-to-day kennel operations from one secure business dashboard. Keep your organization aligned across devices with shared access to essential information.')
+  );
+  intro.append(introContent);
+  box.append(intro);
+  const sectionHeader=el('div',undefined,'module-section-header');
+  const headingGroup=el('div');
+  headingGroup.append(el('p','WORKSPACE DIRECTORY','eyebrow'),el('h2','Management Sections'));
+  sectionHeader.append(headingGroup,el('p','Select a department to view its authorized records and operational tools.','muted'));
+  box.append(sectionHeader);
   const grid=el('div',undefined,'metrics');
-  for(const [name,types] of visibleGroups().filter(([name])=>name!=='Overview')){const b=button('',()=>selectSection(name),'metric'),count=[...rows.values()].filter(r=>types.includes(r.type)&&!r.deleted_at).length;b.append(el('h3',name),el('strong',name==='Employees'?(['owner','admin'].includes(role)?String(teamMembers.length):'Open'):String(count)),el('span',name==='Employees'?(['owner','admin'].includes(role)?'Team members':'Time & work history'):'Shared records'));grid.append(b)}
+  let index=0;
+  for(const [name,types] of visibleGroups().filter(([name])=>name!=='Overview')){
+    const isEmployees=name==='Employee Management';
+    const count=isEmployees?(['owner','admin'].includes(role)?teamMembers.length:null):[...rows.values()].filter(r=>types.includes(r.type)&&!r.deleted_at).length;
+    const card=button('',()=>selectSection(name),'metric');
+    card.setAttribute('aria-label',name+(count===null?'':', '+count+' records')+', open section');
+    const upper=el('div',undefined,'metric-upper');
+    upper.append(el('span',String(++index).padStart(2,'0'),'metric-index'),el('span','OPEN SECTION ↗','metric-open'));
+    card.append(upper,el('h3',name),el('p',moduleDescriptions[name]||'Authorized business records.','metric-description'));
+    const foot=el('div',undefined,'metric-footer');
+    foot.append(el('strong',count===null?'—':String(count),'metric-number'),el('span',isEmployees?'Team members':'Active records'));
+    card.append(foot);grid.append(card);
+  }
   box.append(grid);
-  if(!rows.size)box.append(el('p','No shared records yet. Connect this Business account in your app and sync existing records, or add a record here.','card'));
+  if(!rows.size)box.append(el('p','No shared records are loaded yet. Connect your existing Business account in the Kennel One app and sync, or add a record here.','card overview-empty'));
 }
 function renderPanel(background=false){
-  const overview=active==='Overview',staff=active==='Employees';$('overview').hidden=!overview;$('recordsPanel').hidden=overview||staff;$('employeesPanel').hidden=!staff;if(staff){employees.render(background);return}if(overview)return;
+  const overview=active==='Overview',staff=active==='Employee Management';$('overview').hidden=!overview;$('recordsPanel').hidden=overview||staff;$('employeesPanel').hidden=!staff;if(staff){employees.render(background);return}if(overview)return;
   const selection=$('collection').value,types=groups[active].filter(t=>canRead(role,t));
   $('collection').replaceChildren(...types.map(t=>{const o=el('option',labels[t]);o.value=t;return o}));
   if(types.includes(selection))$('collection').value=selection;
