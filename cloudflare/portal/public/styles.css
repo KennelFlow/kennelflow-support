@@ -95,3 +95,22 @@ button.metric .metric-description{font-size:12px;line-height:1.5;color:#61736d;f
 @media(max-width:370px){.metrics{grid-template-columns:1fr}button.metric{min-height:162px}}
 @media(prefers-reduced-motion:reduce){button.metric{transition:none}button.metric:hover{transform:none}}
 @media print{nav{display:none!important}.corporate-intro{background:#fff;color:#111;border:1px solid #ddd}.corporate-intro h2,.corporate-intro p:last-child{color:#111}}
+
+
+/* Client services, training packages and unified record actions */
+.directory-panel{background:#f8faf9;border:1px solid #dbe4e0;border-radius:8px;padding:18px 18px 15px;margin:20px 0 8px}
+.directory-intro h3{font-size:18px;margin:0 0 5px}
+.directory-intro p{margin:0 0 16px;line-height:1.5}
+.directory-toolbar{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:13px}
+.directory-toolbar label{min-width:185px;max-width:270px}
+.directory-toolbar button{padding:10px 13px}
+.directory-totals{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.directory-stat{font-size:12px;padding:7px 11px;border-radius:6px;border:1px solid #dbe6df;background:#fff;color:#355b4b;font-weight:650}
+.package-summary{border-top:1px solid #dae3df;padding-top:13px;margin-top:8px}
+.package-heading{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:#5a6e66;margin:0 0 10px}
+.package-grid{display:flex;gap:7px;flex-wrap:wrap}
+.service-selector{border:1px solid #d2dfd8;border-radius:8px;padding:14px;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.service-selector legend{font-weight:730;font-size:13px}
+.service-selector .muted{width:100%;margin:0}
+.service-selector .check{margin:0 12px 0 0}
+@media(max-width:650px){.directory-panel{padding:14px}.directory-toolbar{align-items:stretch}.directory-toolbar label{max-width:none;width:100%}.directory-toolbar button{width:100%}}

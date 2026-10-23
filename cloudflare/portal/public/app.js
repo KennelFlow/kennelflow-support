@@ -12,13 +12,14 @@ const groups={
   'Puppy & Litter Records':['puppies','litters'],
   'Breeding Management':['breedingRecords','semenRecords'],
   'Kennel Operations':['kennels','kennelCareSessions'],
-  'Client & Boarding Management':['clients','boardingRecords','customers'],
+  'Client Management':['clients','customers'],
+  'Boarding Management':['boardingRecords'],
   'Health Records':['healthRecords','puppyMedicalRecords','ofaXrays','clinics','vetServices'],
   'Grooming Records':['groomingRecords'],
   'Nutrition & Supplements':['feedingPlans','supplementRecords'],
   'Daily Operations':['dailyDutyRecords','dailyDutyTemplates','dailyDutyShifts'],
   'Scheduling':['calendarEvents','tasks'],
-  'Training Management':['training'],
+  'Dog Training Management':['training'],
   'Maintenance Management':['maintenanceRecords'],
   'Equipment & Inventory':['equipment','inventoryItems','inventoryLocations'],
   'Financial Records':['expenses','payments'],
@@ -34,13 +35,14 @@ const moduleDescriptions={
   'Puppy & Litter Records':'Litter planning, puppy profiles and development records.',
   'Breeding Management':'Breeding history, pairing records and semen inventory.',
   'Kennel Operations':'Kennel assignments, facility activity and care sessions.',
-  'Client & Boarding Management':'Customer information, reservations and boarding histories.',
+  'Client Management':'Client directory, contact details, enrolled services and pet-care profiles.',
+  'Boarding Management':'Boarding reservations, occupancy, drop-off and pickup details.',
   'Health Records':'Veterinary information, vaccinations and medical documentation.',
   'Grooming Records':'Grooming services, visits and treatment records.',
   'Nutrition & Supplements':'Feeding plans, supplements and dietary instructions.',
   'Daily Operations':'Shift categories, duty assignments and completion records.',
   Scheduling:'Events, scheduled tasks and operational reminders.',
-  'Training Management':'Training plans, progress and performance records.',
+  'Dog Training Management':'Client dogs, training schedules, session packages and progress reports.',
   'Maintenance Management':'Repairs, equipment conditions and maintenance history.',
   'Equipment & Inventory':'Facility assets, inventory locations and stock details.',
   'Financial Records':'Business expenses, payment entries and transaction records.',
@@ -51,7 +53,7 @@ const moduleDescriptions={
   'Staff Management':'Team activities, time entries and internal work records.',
   'Employee Management':'Team members, authorized access and invitations.'
 };
-const referenceTypes={puppyID:['puppies'],litterID:['litters'],linkedLitterID:['litters'],linkedDogID:['dogs'],linkedPuppyID:['puppies'],dogID:['dogs'],kennelID:['kennels'],areaID:['kennels','inventoryLocations'],vehicleAreaID:['inventoryLocations'],placementID:['smartPlacements'],clientID:['clients'],templateID:['dailyDutyTemplates'],folderID:['scanFolders'],tagID:['smartTags'],containerTagID:['smartTags'],tripID:['travelManifests'],itemID:['inventoryItems']};
+const referenceTypes={clientID:['clients'],puppyID:['puppies'],litterID:['litters'],linkedLitterID:['litters'],linkedDogID:['dogs'],linkedPuppyID:['puppies'],dogID:['dogs'],kennelID:['kennels'],areaID:['kennels','inventoryLocations'],vehicleAreaID:['inventoryLocations'],placementID:['smartPlacements'],clientID:['clients'],templateID:['dailyDutyTemplates'],folderID:['scanFolders'],tagID:['smartTags'],containerTagID:['smartTags'],tripID:['travelManifests'],itemID:['inventoryItems']};
 let teamMembers=[];
 let rows=new Map(),identity=null,kennels=[],kennel='',role='',active='Overview',loading=false,loadSequence=0,editor=null,saving=false;
 let month=new Date(new Date().getFullYear(),new Date().getMonth(),1),selectedDay='';
@@ -171,7 +173,15 @@ function chosen(){return $('collection').value}
 function renderList(){
   const type=chosen(),term=$('search').value.trim().toLowerCase(),deleted=$('deleted').checked;
   $('add').hidden=!canWrite(role,type);$('add').textContent='Add '+(labels[type]||'record').toLowerCase();
+
   let list=[...rows.values()].filter(r=>r.type===type&&(deleted?!!r.deleted_at:!r.deleted_at)&&(!term||JSON.stringify(r.record).toLowerCase().includes(term)));
+  const category=window.__kennelClientCategory||'All clients';
+  if(type==='clients'&&category!=='All clients'){
+    list=list.filter(r=>(r.record?.services||'').split(',').map(x=>x.trim()).includes(category));
+  }
+  renderClientPanel(type);
+  renderTrainingPanel(type);
+  if(type==='training'&&window.__kennelTrainingClient)list=list.filter(r=>String(r.record.clientID||'').toLowerCase()===window.__kennelTrainingClient.toLowerCase());
   renderCalendar(type,list);
   renderSpecialized(type,list);
   if(type==='calendarEvents'&&!deleted){ $('list').replaceChildren();$('count').textContent=selectedDay?'Schedule for '+selectedDay:'Choose a date';return }
@@ -185,7 +195,9 @@ function renderList(){
     if(canWrite(role,type)&&row.record){actions.append(button(row.deleted_at?'Restore':'Edit',()=>row.deleted_at?restore(row):openEditor(row)));if(!row.deleted_at)actions.append(button('Delete',()=>remove(row),'danger'))}
     if(!row.deleted_at&&['documents','scannedReports'].includes(type)&&['owner','admin'].includes(role)){actions.append(button('Download',()=>download(row)));actions.append(button('Replace file',()=>replaceFile(row)));}
     if(!row.deleted_at&&type==='tasks'&&canWrite(role,type))actions.append(button(row.record.completed?'Reopen':'Complete',()=>toggleCompleted(row)));
-    if(!row.deleted_at){actions.append(button(type==='payments'?'Receipt':'Print record',()=>showReport(type==='payments'?'Payment receipt':recordName(row.record),[[labels[type],[row.record]]])));if(type==='dogs')workflows.dogActions(row,actions);if(type==='smartTags')actions.append(button('View / print QR',()=>showTagQR(row)));if(canWrite(role,'documents')&&!['documents','scannedReports'].includes(type))actions.append(button('Attach photo / document',()=>attachDocument(row)))}
+    if(!row.deleted_at){actions.append(button(type==='payments'?'Receipt':'Print record',()=>showReport(type==='payments'?'Payment receipt':recordName(row.record),[[labels[type],[row.record]]])));if(type==='dogs')workflows.dogActions(row,actions);if(type==='smartTags')actions.append(button('View / print QR',()=>showTagQR(row)));if(['clients','training','boardingRecords'].includes(type))actions.append(button('Share',()=>shareRecord(row)));
+      if(type==='training'&&canWrite(role,'calendarEvents'))actions.append(button('Schedule session',()=>scheduleTraining(row)));
+      if(canWrite(role,'documents')&&!['documents','scannedReports'].includes(type))actions.append(button('Attach photo / document',()=>attachDocument(row)))}
     head.append(text,actions);card.append(head);
     const detail=el('details',undefined,'detail-block');detail.append(el('summary','View record details'));const dl=el('dl');
     for(const [key,value] of Object.entries(row.record||{})){if(key==='id'||value==null||value==='')continue;dl.append(el('dt',human(key)),el('dd',displayValue(value,key)))}detail.append(dl);card.append(detail);
@@ -436,6 +448,99 @@ function renderSpecialized(type,list){
   }
 }
 
+
+function clientRows(){
+  return [...rows.values()].filter(r=>r.type==='clients'&&!r.deleted_at);
+}
+function renderClientPanel(type){
+  const panel=$('clientTools');panel.replaceChildren();panel.hidden=type!=='clients';
+  if(type!=='clients')return;
+  const head=el('div',undefined,'directory-intro');
+  head.append(el('h3','Client Directory'),el('p','Manage each client’s contact information, pets, medical instructions and enrolled services.','muted'));
+  panel.append(head);
+  const toolbar=el('div',undefined,'directory-toolbar');
+  const label=el('label','Filter by service');
+  const filter=el('select');filter.id='clientServiceFilter';
+  const current=window.__kennelClientCategory||'All clients';
+  for(const option of ['All clients','Boarding','Grooming','Training']){
+    const entry=el('option',option);entry.value=option;filter.append(entry);
+  }
+  filter.value=current;
+  filter.addEventListener('change',()=>{window.__kennelClientCategory=filter.value;renderList()});
+  label.append(filter);toolbar.append(label);
+  if(canWrite(role,'clients'))toolbar.append(button('Add client',()=>{
+    const value=newRecord('ClientRecord');
+    if(current!=='All clients')value.services=current;
+    openEditor(null,'clients',value)
+  }));
+  toolbar.append(button('Print client directory',()=>{
+    const all=clientRows().filter(r=>current==='All clients'||(r.record.services||'').split(',').map(s=>s.trim()).includes(current));
+    showReport('Client Directory', [['Client Profiles',all.map(r=>r.record)]]);
+  },'secondary'));
+  panel.append(toolbar);
+  const totals=el('div',undefined,'directory-totals');
+  for(const category of ['All clients','Boarding','Grooming','Training']){
+    const n=clientRows().filter(r=>category==='All clients'||(r.record.services||'').split(',').map(s=>s.trim()).includes(category)).length;
+    totals.append(el('span',category+': '+n,'directory-stat'));
+  }
+  panel.append(totals);
+}
+function renderTrainingPanel(type){
+  const panel=$('trainingTools');panel.replaceChildren();panel.hidden=type!=='training';
+  if(type!=='training')return;
+  const head=el('div',undefined,'directory-intro');
+  head.append(el('h3','Client Dog Training'),el('p','Track clients, dogs, trainers, booked sessions, packages, goals and progress in one training workspace.','muted'));
+  panel.append(head);
+  const toolbar=el('div',undefined,'directory-toolbar');
+  const clientLabel=el('label','Training client');
+  const pick=el('select');pick.id='trainingClientFilter';
+  let opt=el('option','All training clients');opt.value='';pick.append(opt);
+  for(const client of clientRows()){
+    opt=el('option',client.record.name);opt.value=client.id;pick.append(opt)
+  }
+  pick.value=window.__kennelTrainingClient||'';
+  pick.addEventListener('change',()=>{window.__kennelTrainingClient=pick.value;renderList()});
+  clientLabel.append(pick);toolbar.append(clientLabel);
+  if(canWrite(role,'training'))toolbar.append(button('Add training record',()=>openEditor(null,'training')));
+  if(canWrite(role,'calendarEvents'))toolbar.append(button('Book training session',()=>scheduleTraining()));
+  panel.append(toolbar);
+  const records=[...rows.values()].filter(r=>r.type==='training'&&!r.deleted_at);
+  const packages=new Map();
+  for(const row of records){
+    const key=(row.record?.packageName||'').trim();if(!key)continue;
+    const value=packages.get(key)||{count:0,sessions:0};
+    value.count++;value.sessions+=Number(row.record.packageSessions||0);packages.set(key,value);
+  }
+  if(packages.size){
+    const box=el('div',undefined,'package-summary');
+    box.append(el('h4','Training packages','package-heading'));
+    const grid=el('div',undefined,'package-grid');
+    for(const [name,stat] of packages)grid.append(el('div',name+' · '+stat.count+' record'+(stat.count===1?'':'s'),'directory-stat'));
+    box.append(grid);panel.append(box);
+  }
+}
+async function shareRecord(row){
+  const display=Object.entries(row.record||{}).filter(([k,v])=>k!=='id'&&v!=null&&v!=='').map(([key,value])=>human(key)+': '+displayValue(value,key)).join('\n');
+  const title='Kennel One · '+recordName(row.record);
+  try{
+    if(navigator.share)await navigator.share({title,text:title+'\n'+display});
+    else if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(title+'\n'+display);message('Record details copied for sharing.')}
+    else showReport(title,[[labels[row.type],[row.record]]]);
+  }catch(error){if(error?.name!=='AbortError')message('Sharing unavailable: '+error.message)}
+}
+function scheduleTraining(row){
+  const draft=newRecord('KennelCalendarEvent');
+  const record=row?.record||{};
+  draft.title='Training · '+(record.dogName||'Client dog');
+  draft.category='Training';
+  draft.startDate=record.nextSession||record.date||isoDate(Date.now());
+  draft.endDate=isoDate(new Date(Date.parse(draft.startDate)+Math.max(15,record.durationMinutes||60)*60000));
+  draft.notes=[record.packageName&&'Package: '+record.packageName,record.trainerName&&'Trainer: '+record.trainerName,record.trainingGoals].filter(Boolean).join('\n');
+  draft.linkedType='TrainingRecord';
+  if(row)draft.linkedID=row.id;
+  openEditor(null,'calendarEvents',draft);
+}
+
 function displayValue(value,key){if(typeof value==='boolean')return value?'Yes':'No';if(Array.isArray(value))return value.map(x=>typeof x==='object'?Object.entries(x).filter(([k])=>k!=='id').map(([k,v])=>human(k)+': '+displayValue(v,k)).join(' · '):String(x)).join('\n');if(typeof value==='object')return JSON.stringify(value);if(typeof value==='string'&&/^\d{4}-\d\d-\d\dT/.test(value))return new Date(value).toLocaleString();return String(value)}
 function renderCalendar(type,list){
   const box=$('calendar');box.replaceChildren();if(type!=='calendarEvents'||$('deleted').checked)return;
@@ -464,6 +569,17 @@ function renderObject(model,object,parent){
     if(field.key==='id'||(['documents','scannedReports'].includes(editor?.type)&&field.key==='fileName'))continue;
     const label=el('label',human(field.key)),value=object[field.key],type=field.type;
     if(type.startsWith('[')){parent.append(renderArray(field,object));continue}
+    if(model==='ClientRecord'&&field.key==='services'){
+      const wrap=el('fieldset',undefined,'wide service-selector'),legend=el('legend','Client services');
+      wrap.append(legend,el('p','Select all services this client uses.','muted'));
+      for(const category of ['Boarding','Grooming','Training']){
+        const item=el('label',undefined,'check');
+        const input=el('input');input.type='checkbox';input.checked=(object.services||'').split(',').map(x=>x.trim()).includes(category);
+        input.addEventListener('change',()=>{const values=new Set((object.services||'').split(',').map(x=>x.trim()).filter(Boolean));input.checked?values.add(category):values.delete(category);object.services=[...values].join(', ');dirty()});
+        item.append(input,document.createTextNode(category));wrap.append(item);
+      }
+      parent.append(wrap);continue;
+    }
     let control;
     if(field.key==='assignedTo'&&teamMembers.length){
       control=el('select');const blank=el('option','Unassigned');blank.value='';control.append(blank);
@@ -482,7 +598,7 @@ function renderObject(model,object,parent){
       }
       for(const [v,text] of options){const option=el('option',text);option.value=v;control.append(option)}control.value=value==null?'':String(value);
     }else if(type==='Bool'){control=el('input');control.type='checkbox';control.checked=!!value;label.classList.add('check')}
-    else if(type==='String'&&/notes|instructions|text|description|detail|body|plan/i.test(field.key)){control=el('textarea');control.value=value||'';label.classList.add('wide')}
+    else if(type==='String'&&/notes|instructions|text|description|detail|body|plan|medications|allergies|homework|goals/i.test(field.key)){control=el('textarea');control.value=value||'';label.classList.add('wide')}
     else {control=el('input');control.type=type==='Date'?'datetime-local':['Double','Int','Int64'].includes(type)?'number':field.key.toLowerCase().includes('email')?'email':'text';if(type==='Date')control.step='1';if(control.type==='number')control.step=type==='Double'?'any':'1';control.value=value==null?'':type==='Date'?dateInput(value):String(value)}
     control.required=!field.optional&&type!=='Bool';control.dataset.field=field.key;
     const pickerOptions=field.key==='breed'?catalog.recognizedBreeds:field.key==='color'?breedColors(object.breed):field.key==='coat'?breedCoats(object.breed):field.key.toLowerCase().includes('registrationorganization')||field.key==='registry'?catalog.registries:field.key==='sex'?['Male','Female','Unknown']:null;
