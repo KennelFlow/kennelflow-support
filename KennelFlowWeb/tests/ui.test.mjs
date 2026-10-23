@@ -27,7 +27,18 @@ test('all forms, save, cross-device merge and session-expiry draft preservation'
   const $=id=>document.getElementById(id),clickText=(root,text)=>{const b=[...root.querySelectorAll('button')].find(b=>b.textContent===text);assert.ok(b,text);b.click()},input=(control,value)=>{control.value=value;control.dispatchEvent(new window.Event('input',{bubbles:true}))};
   try{
     await import('../app.js');await until(()=>$('connection').textContent.startsWith('Synced'));
-    assert.equal($('workspace').hidden,false);assert.equal(document.querySelectorAll('.metric').length,18);
+    assert.equal($('workspace').hidden,false);assert.equal(document.querySelectorAll('.metric').length,19);
+    const healthMetric=[...document.querySelectorAll('.metric')].find(b=>b.querySelector('h3').textContent==='Health');
+    const groomingMetric=[...document.querySelectorAll('.metric')].find(b=>b.querySelector('h3').textContent==='Grooming');
+    assert.ok(healthMetric,'Health has its own overview box');
+    assert.ok(groomingMetric,'Grooming has its own overview box');
+    assert.equal(healthMetric.querySelector('strong').textContent,'5');
+    assert.equal(groomingMetric.querySelector('strong').textContent,'1');
+    clickText($('nav'),'Health');
+    assert.deepEqual([...$('collection').options].map(x=>x.value),['healthRecords','puppyMedicalRecords','ofaXrays','clinics','vetServices']);
+    clickText($('nav'),'Grooming');
+    assert.deepEqual([...$('collection').options].map(x=>x.value),['groomingRecords']);
+    clickText($('nav'),'Overview');
     const employeeMetric=[...document.querySelectorAll('.metric')].find(b=>b.querySelector('h3').textContent==='Employees');assert.equal(employeeMetric.querySelector('strong').textContent,'1');assert.match(employeeMetric.textContent,/Team members/);
     let checked=0;
     for(const nav of [...$('nav').querySelectorAll('button')].filter(b=>!['Overview','Employees'].includes(b.textContent))){
