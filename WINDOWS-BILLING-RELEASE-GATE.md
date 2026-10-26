@@ -44,3 +44,10 @@ Production checkout smoke test on October 26: Square created both links successf
 - New `BusinessBackend/tests/windows-billing-e2e.test.mjs` exercises the payment/order/active-subscription/owner+staff entitlement path with mocked Square HTTP responses and a real in-memory PostgreSQL engine, verifies idempotent settlement, and rejects missing/mismatched or ambiguous evidence. This test is NOT a live completed Square purchase.
 - Microsoft Store submission can proceed through its independent certification process; do not switch on paid access restrictions or claim automatic subscription activation is production-verified.
 - Remaining release blocker: a **separately authorized real production purchase** must be checked end-to-end from secure Square payment through subscription paid_until_date, stored kennel ownership, account unlock and renewal/cancellation handling. Do not initiate a real charge without purchaser approval. Production DB migrations and cross-platform proof linking remain gated.
+
+2026-10-26 WINDOWS TRIAL-TO-CHECKOUT UX RELEASE FIX:
+- During an active 14-day trial, the kennel owner can now choose monthly, annual or lifetime checkout instead of waiting for the trial to expire. Employees never see purchase actions, and already-paid owners cannot be charged twice through this UI.
+- Billing text now distinguishes a card-free trial (no automatic charge) from an immediately charged Square purchase, and clearly describes renewal/cancellation of recurring plans.
+- New browser-logic regression checks in cloudflare/portal/tests/billing-trial-ui.test.mjs cover trial owner, unpaid owner, paid owner and employee permissions.
+- Full isolated suite: 136/136 passing on October 26, 2026. Changes committed to staging branch only; no Microsoft submission replaced, no production deploy, no customer charges.
+- Square merchant self-payment is not a valid $10.99 production purchase test (see Square Payment Terms); require an unrelated willing customer completing an actual purchase, with their payment details entered privately into Square checkout, before considering production payment-to-access verified.

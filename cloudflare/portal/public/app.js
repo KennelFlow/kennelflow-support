@@ -111,13 +111,16 @@ async function refreshSubscriptionBanner(){
       banner.append(el('strong',status.state==='trial'?'Kennel One free trial active':'Kennel One subscription active'));
       if(status.validThrough)banner.append(el('p','Access through '+new Date(status.validThrough).toLocaleDateString()+'.'));
       else if(status.plan==='lifetime')banner.append(el('p','Lifetime access active.'));
-      if(status.state==='trial')banner.append(el('p','When your free trial ends, you can choose a paid plan here. Existing paid subscribers do not need to purchase again.'));
-    }else{
+      if(status.state==='trial')banner.append(el('p','You can choose a paid plan during your trial. Square will charge when you check out; the free trial itself does not automatically charge a card.'));
+    }
+    if(!status.active){
       banner.append(el('strong','Subscription needed'));
       banner.append(el('p','If you have already purchased Kennel One on iPhone or Android, link that purchase to this account before paying again.'));
-      if(role==='owner'){
+    }
+    if(role==='owner'&&(!status.active||status.state==='trial')){
         const plans=el('div',undefined,'billing-plans');
         const notice=el('p','', 'muted');
+        banner.append(el('p','Square charges at checkout. Monthly $10.99 and yearly $99.99 renew automatically until canceled; lifetime $299.99 is a one-time purchase. Manage or cancel recurring billing using Square’s subscription email.','muted'));
         for(const [plan,label] of [['monthly','$10.99 monthly'],['annual','$99.99 yearly'],['lifetime','$299.99 lifetime']]){
           plans.append(button(label,async()=>{
             plans.querySelectorAll('button').forEach(b=>b.disabled=true);
@@ -156,7 +159,6 @@ async function refreshSubscriptionBanner(){
         },'secondary');
         const waiting=el('p','A checkout link is not proof of payment. Only Square confirmation will unlock Kennel One.','muted');
         banner.append(plans,check,notice,waiting);
-      }
     }
   }catch(e){
     banner.hidden=false;
