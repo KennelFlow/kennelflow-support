@@ -14,6 +14,7 @@ RELEASE BLOCKERS:
 4. BLOCKED: no real completed payment-to-entitlement test has run. Live checkout link creation does not prove paid-user access.
 5. iOS and Android apps still require native cross-platform purchase linking. The Android source (KennelOne-Android-Build17, version 3.0.0) has no Google Play Billing dependency or purchase-token bridge; a native edit was blocked and is not represented as complete. iOS StoreKit currently verifies purchases locally and also needs a signed-proof account bridge.
 6. Database migrations are not deployed and the Microsoft Store update is not submitted.
+7. Microsoft Store policy 7.20 (effective October 22, 2026), section 10.8, permits secure third-party subscription billing for non-game PC apps. Mark use of a third-party purchase API in Partner Center and disclose $10.99 monthly, $99.99 yearly, $299.99 lifetime, auto-renewal, and the 14-day free trial clearly before checkout. Source: https://learn.microsoft.com/windows/apps/publish/store-policies
 
 READ-ONLY ACCOUNT AUDIT (after secure live Square authorization):
 node scripts/verify-square-production-plans.mjs
