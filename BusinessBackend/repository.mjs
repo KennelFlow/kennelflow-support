@@ -45,6 +45,13 @@ export function createRepository(connectionString) {
     purchase.validThrough||null,new Date().toISOString()
    ])).rows[0].status);
   },
+  async reconcileAppleEvent(verified){
+   const result=await pool.query(
+    'SELECT business_reconcile_apple_event($1,$2,$3,$4,$5,$6) AS result',
+    [verified.eventId,verified.providerPurchaseId,verified.plan,
+     verified.state,verified.validThrough,verified.verifiedAt]);
+   return result.rows[0].result;
+  },
   async reconcileSquareRefundEvent(verified){
    const result=await pool.query(
     'SELECT business_reconcile_square_refund_event($1,$2,$3,$4) AS result',

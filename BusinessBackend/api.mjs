@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID, createHash, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import {verifyApplePurchase,verifyGooglePurchase} from './billing.mjs';
+import {verifyAppleNotification} from './billing-apple-webhook.mjs';
 import {createWindowsPaymentLink} from './billing-square.mjs';
 import {verifyPendingWindowsCheckout,verifyWindowsSubscriptionRenewal} from './billing-square-verify.mjs';
 import {validateSquareWebhook,verifySquareSubscriptionWebhook,verifySquareRefundWebhook} from './billing-square-webhook.mjs';
@@ -32,10 +33,18 @@ async function bytes(request, maximum=1048576) {
  return Buffer.concat(chunks);
 }
 async function body(request) { return JSON.parse((await bytes(request)).toString('utf8')||'{}'); }
-export function createAPI(repo, {billingEnforced=process.env.KENNELONE_BILLING_ENFORCEMENT==='true', verifyApple=verifyApplePurchase, verifyGoogle=verifyGooglePurchase, verifyWindowsRenewal=verifyWindowsSubscriptionRenewal}={}) {
+export function createAPI(repo, {billingEnforced=process.env.KENNELONE_BILLING_ENFORCEMENT==='true', verifyApple=verifyApplePurchase, verifyGoogle=verifyGooglePurchase, verifyAppleWebhook=verifyAppleNotification, verifyWindowsRenewal=verifyWindowsSubscriptionRenewal}={}) {
  return { async fetch(request) {
  try {
  const url=new URL(request.url),path=url.pathname.replace(/^\/kennelflowapi(?=\/|$)/,'');
+ if(request.method==='POST'&&['/v2/billing/webhook/apple','/v2/billing/webhook/apple/sandbox'].includes(path)){
+   const input=JSON.parse((await bytes(request,131072)).toString('utf8')||'{}');
+   const environment=path.endsWith('/sandbox')?'sandbox':'production';
+   const verified=await verifyAppleWebhook(input.signedPayload,{environment});
+   if(verified.ignored)return response(200,{ok:true,ignored:true,test:verified.test===true});
+   const result=await repo.reconcileAppleEvent(verified);
+   return response(200,{ok:true,...result});
+ }
  if(request.method==='POST'&&path==='/v2/billing/webhook/square'){
    const event=validateSquareWebhook({
     signature:request.headers.get('x-square-hmacsha256-signature'),
