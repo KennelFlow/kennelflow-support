@@ -48,3 +48,24 @@ test('lifetime entitlement only results from completed verified lifetime checkou
 test('lack of Square credentials fails closed',async()=>{
  await assert.rejects(verifyCompletedCheckout({checkout,paymentId:'PAY-100'},{},stub()),{status:503});
 });
+
+import {verifyPendingWindowsCheckout} from '../billing-square-verify.mjs';
+const pendingCheckout={
+  plan:'annual',orderId:'ORDER-100',createdAt:'2026-10-26T01:00:00.000Z'
+};
+test('hosted sandbox checkout payment without customer ID cannot unlock an account',async()=>{
+ const orderWithTender={...order,tenders:[{payment_id:'PAY-100'}]};
+ const noCustomer={...pay,customer_id:undefined};
+ await assert.rejects(
+  verifyPendingWindowsCheckout(pendingCheckout,env,stub(noCustomer,orderWithTender)),
+  {status:409}
+ );
+});
+test('completed payment with customer but no matching recurring subscription is not enough',async()=>{
+ const orderWithTender={...order,tenders:[{payment_id:'PAY-100'}]};
+ const fetcher=async (url,opts)=>{
+  if(url.endsWith('/v2/subscriptions/search'))return Response.json({subscriptions:[]});
+  return stub(pay,orderWithTender)(url,opts);
+ };
+ await assert.rejects(verifyPendingWindowsCheckout(pendingCheckout,env,fetcher),{status:409});
+});
