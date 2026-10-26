@@ -66,3 +66,27 @@ test('Windows billing gateway refuses employee or foreign kennel renewal request
  assert.equal(foreignCheck.status,403);
  assert(!staffCalls.includes('/v2/billing/refresh'));
 });
+
+
+test('Square callback requires a signature and forwards untouched JSON without customer sign-in',async()=>{
+ const payload=JSON.stringify({event_id:'event-test',type:'subscription.updated',data:{id:'sandbox-sub'}});
+ const target='/api/billing/webhook/square';
+ const seen=[];
+ const fetcher=async(url,options)=>{
+  seen.push({url,options});
+  return Response.json({ok:true,matched:false});
+ };
+ const makeRequest=signature=>new Request(origin+target,{
+  method:'POST',
+  headers:{'Content-Type':'application/json',...(signature?{'x-square-hmacsha256-signature':signature}:{})},
+  body:payload
+ });
+ const unsigned=await handleDirect(makeRequest(null),{},fetcher);
+ assert.equal(unsigned.status,403);assert.equal(seen.length,0);
+ const signed=await handleDirect(makeRequest('test-only-square-signature'),{},fetcher);
+ assert.equal(signed.status,200);
+ assert.equal(seen.length,1);
+ assert.equal(new URL(seen[0].url).pathname,'/v2/billing/webhook/square');
+ assert.equal(Buffer.from(seen[0].options.body).toString('utf8'),payload);
+ assert.equal(seen[0].options.headers['x-square-hmacsha256-signature'],'test-only-square-signature');
+});

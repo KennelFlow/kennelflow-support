@@ -3,6 +3,7 @@ import { promisify } from 'node:util';
 import {verifyApplePurchase,verifyGooglePurchase} from './billing.mjs';
 import {createWindowsPaymentLink} from './billing-square.mjs';
 import {verifyPendingWindowsCheckout,verifyWindowsSubscriptionRenewal} from './billing-square-verify.mjs';
+import {validateSquareWebhook,verifySquareSubscriptionWebhook,verifySquareRefundWebhook} from './billing-square-webhook.mjs';
 import { canManage, canRead, canWrite, validEmail, validPassword, validUUID, validateRecord, collections } from './policy.mjs';
 const derive=promisify(scrypt);
 export function normalizeBusinessWebsite(value) {
@@ -35,6 +36,27 @@ export function createAPI(repo, {billingEnforced=process.env.KENNELONE_BILLING_E
  return { async fetch(request) {
  try {
  const url=new URL(request.url),path=url.pathname.replace(/^\/kennelflowapi(?=\/|$)/,'');
+ if(request.method==='POST'&&path==='/v2/billing/webhook/square'){
+   const event=validateSquareWebhook({
+    signature:request.headers.get('x-square-hmacsha256-signature'),
+    rawBody:await bytes(request,131072),
+    signatureKey:process.env.KO_SQUARE_WEBHOOK_SIGNATURE_KEY,
+    notificationUrl:process.env.KO_SQUARE_WEBHOOK_NOTIFICATION_URL,
+    // The public webhook URL is the signature basis; a trusted gateway may forward to an internal API URL.
+    requestUrl:process.env.KO_SQUARE_WEBHOOK_NOTIFICATION_URL
+   });
+   // A valid signature proves origin, NOT payment. Fetch current state from Square.
+   if(['refund.created','refund.updated'].includes(event.type)){
+    const refund=await verifySquareRefundWebhook(event);
+    if(refund.ignored)return response(200,{ok:true,ignored:true});
+    const status=await repo.reconcileSquareRefundEvent(refund);
+    return response(200,{ok:true,...status});
+   }
+   const verified=await verifySquareSubscriptionWebhook(event);
+   if(verified.ignored)return response(200,{ok:true,ignored:true});
+   const state=await repo.reconcileSquareSubscriptionEvent(verified);
+   return response(200,{ok:true,...state});
+  }
  if(request.method==='GET'&&path==='/v2/capabilities')return response(200,{version:2,employeeAccounts:true,revisionSync:true,collections});
  if(request.method==='POST'&&path==='/v2/signup') {
   const input=await body(request),email=String(input.email||'').trim().toLowerCase();

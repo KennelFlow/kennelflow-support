@@ -40,7 +40,7 @@ async function migrations(db){
  for(const filename of ['001_kennelflow.sql','002_revision_sync.sql','003_security_hardening.sql',
   '004_auth.sql','005_access_control.sql','006_password_reset.sql','007_business.sql',
   '008_files.sql','009_employees.sql','010_business_profile.sql','011_private_messages.sql',
-  '012_unified_billing.sql','013_windows_checkout.sql','014_windows_settlement.sql','015_windows_renewal.sql'])
+  '012_unified_billing.sql','013_windows_checkout.sql','014_windows_settlement.sql','015_windows_renewal.sql','016_square_webhooks.sql'])
   await db.exec(await readFile(new URL('../schema/'+filename,import.meta.url),'utf8'));
 }
 async function as(db,actor,sql,params=[]){

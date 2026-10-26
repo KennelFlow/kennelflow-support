@@ -107,6 +107,24 @@ async function legacyCall(request,fetcher) {
 async function direct(request,env={},fetcher=fetch) {
   const u=new URL(request.url),path=u.pathname,method=request.method;
   if(!path.startsWith('/api/'))return jsonResponse(404,{error:'Not found'});
+  // Square's server-to-server callbacks have no browser Origin or kennel
+  // cookie. Forward the exact raw bytes and signed header to the backend.
+  // ONLY the backend's HMAC verifier can accept this event as authentic.
+  if(path==='/api/billing/webhook/square'&&method==='POST'){
+    const claimedSize=Number(request.headers.get('content-length')||0);
+    if(claimedSize>131072)return jsonResponse(413,{error:'Webhook too large'});
+    const raw=await request.arrayBuffer();
+    if(raw.byteLength===0||raw.byteLength>131072)return jsonResponse(413,{error:'Webhook body required'});
+    const signature=request.headers.get('x-square-hmacsha256-signature');
+    if(!signature||signature.length>128)return jsonResponse(403,{error:'Missing Square signature'});
+    const result=await fetcher(BACKEND+'/v2/billing/webhook/square',{
+      method:'POST',headers:{'Content-Type':'application/json',
+        'x-square-hmacsha256-signature':signature},
+      body:raw,redirect:'manual',signal:AbortSignal.timeout(15000)
+    });
+    if(result.status>=300&&result.status<400)throw fail(502,'Webhook redirect blocked');
+    return forward(result);
+  }
   if(!allowedCors(request))return jsonResponse(403,{error:'Origin not allowed'});
   if(!env.KO_SESSION_KEY&&!env.SESSIONS)return legacyCall(request,fetcher);
 

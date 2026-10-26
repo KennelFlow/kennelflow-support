@@ -45,6 +45,20 @@ export function createRepository(connectionString) {
     purchase.validThrough||null,new Date().toISOString()
    ])).rows[0].status);
   },
+  async reconcileSquareRefundEvent(verified){
+   const result=await pool.query(
+    'SELECT business_reconcile_square_refund_event($1,$2,$3,$4) AS result',
+    [verified.eventId,verified.orderId,verified.paymentId,new Date().toISOString()]);
+   return result.rows[0].result;
+  },
+  async reconcileSquareSubscriptionEvent(verified) {
+   const result=await pool.query(
+    'SELECT business_reconcile_square_subscription_event($1,$2,$3,$4,$5,$6) AS result',
+    [verified.eventId,verified.providerPurchaseId,verified.plan,verified.state,
+     verified.validThrough||null,new Date().toISOString()]
+   );
+   return result.rows[0].result;
+  },
   async windowsSubscriptionForRefresh(actor,kennel) {
    return scoped(actor,kennel,async c=>(await c.query(
     'SELECT business_windows_subscription_for_refresh($1) AS checkout',[kennel])).rows[0].checkout);
