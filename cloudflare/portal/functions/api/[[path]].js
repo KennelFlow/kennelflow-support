@@ -107,6 +107,24 @@ async function legacyCall(request,fetcher) {
 async function direct(request,env={},fetcher=fetch) {
   const u=new URL(request.url),path=u.pathname,method=request.method;
   if(!path.startsWith('/api/'))return jsonResponse(404,{error:'Not found'});
+  // Square's server-to-server callbacks have no browser Origin or kennel
+  // cookie. Forward the exact raw bytes and signed header to the backend.
+  // ONLY the backend's HMAC verifier can accept this event as authentic.
+  if(path==='/api/billing/webhook/square'&&method==='POST'){
+    const claimedSize=Number(request.headers.get('content-length')||0);
+    if(claimedSize>131072)return jsonResponse(413,{error:'Webhook too large'});
+    const raw=await request.arrayBuffer();
+    if(raw.byteLength===0||raw.byteLength>131072)return jsonResponse(413,{error:'Webhook body required'});
+    const signature=request.headers.get('x-square-hmacsha256-signature');
+    if(!signature||signature.length>128)return jsonResponse(403,{error:'Missing Square signature'});
+    const result=await fetcher(BACKEND+'/v2/billing/webhook/square',{
+      method:'POST',headers:{'Content-Type':'application/json',
+        'x-square-hmacsha256-signature':signature},
+      body:raw,redirect:'manual',signal:AbortSignal.timeout(15000)
+    });
+    if(result.status>=300&&result.status<400)throw fail(502,'Webhook redirect blocked');
+    return forward(result);
+  }
   if(!allowedCors(request))return jsonResponse(403,{error:'Origin not allowed'});
   if(!env.KO_SESSION_KEY&&!env.SESSIONS)return legacyCall(request,fetcher);
 
@@ -186,6 +204,45 @@ async function direct(request,env={},fetcher=fetch) {
     return forward(await upstream('/v2/business-profile',token,'PATCH',input,false,fetcher));
   }
   if(path==='/api/me'&&method==='GET')return forward(await upstream('/v2/me',token,'GET',undefined,false,fetcher));
+  if(path==='/api/billing/status'&&method==='GET'){
+    const scope=String(u.searchParams.get('kennel')||'').toLowerCase();
+    if(!uuid(scope))throw fail(400,'Invalid kennel ID');
+    await membership(token,scope,fetcher);
+    return forward(await upstream('/v2/billing/status?kennel='+encodeURIComponent(scope),token,'GET',undefined,false,fetcher));
+  }
+  if(path==='/api/billing/link'&&method==='POST'){
+    const input=await parseJSON(request,40000),scope=String(input.kennel||'').toLowerCase();
+    if(!uuid(scope)||!['apple','google'].includes(input.provider)||
+       typeof input.proof!=='string'||!input.proof||input.proof.length>30000)
+       throw fail(400,'Invalid purchase proof');
+    const member=await membership(token,scope,fetcher);
+    if(member.role!=='owner')throw fail(403,'Only the kennel owner can link purchases');
+    return forward(await upstream('/v2/billing/link',token,'POST',{kennel:scope,provider:input.provider,proof:input.proof},false,fetcher));
+  }
+  if(path==='/api/billing/checkout'&&method==='POST'){
+    const input=await parseJSON(request,16384),scope=String(input.kennel||'').toLowerCase();
+    if(!uuid(scope)||!['monthly','annual','lifetime'].includes(input.plan))
+     throw fail(400,'Select a valid Kennel One subscription');
+    const member=await membership(token,scope,fetcher);
+    if(member.role!=='owner')throw fail(403,'Only the kennel owner can start checkout');
+    return forward(await upstream('/v2/billing/checkout',token,'POST',{kennel:scope,plan:input.plan},false,fetcher));
+  }
+  if(path==='/api/billing/checkout/confirm'&&method==='POST'){
+    const input=await parseJSON(request,16384),scope=String(input.kennel||'').toLowerCase();
+    if(!uuid(scope))throw fail(400,'Invalid kennel ID');
+    const member=await membership(token,scope,fetcher);
+    if(member.role!=='owner')throw fail(403,'Only the kennel owner can check payment');
+    return forward(await upstream('/v2/billing/checkout/confirm',token,'POST',{kennel:scope},false,fetcher));
+  }
+
+  if(path==='/api/billing/refresh'&&method==='POST'){
+    const input=await parseJSON(request,16384),scope=String(input.kennel||'').toLowerCase();
+    if(!uuid(scope))throw fail(400,'Invalid kennel ID');
+    const member=await membership(token,scope,fetcher);
+    if(member.role!=='owner')throw fail(403,'Only the kennel owner can refresh Square billing');
+    return forward(await upstream('/v2/billing/refresh',token,'POST',{kennel:scope},false,fetcher));
+  }
+
   if(path==='/api/kennels'&&method==='GET'){
     const r=await upstream('/v2/me',token,'GET',undefined,false,fetcher),v=await r.json();
     return jsonResponse(r.status,r.status===200?{kennels:v.kennels}:v);

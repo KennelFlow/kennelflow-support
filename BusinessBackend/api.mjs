@@ -1,5 +1,10 @@
 import { randomBytes, randomUUID, createHash, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
+import {verifyApplePurchase,verifyGooglePurchase} from './billing.mjs';
+import {verifyAppleNotification} from './billing-apple-webhook.mjs';
+import {createWindowsPaymentLink} from './billing-square.mjs';
+import {verifyPendingWindowsCheckout,verifyWindowsSubscriptionRenewal} from './billing-square-verify.mjs';
+import {validateSquareWebhook,verifySquareSubscriptionWebhook,verifySquareRefundWebhook} from './billing-square-webhook.mjs';
 import { canManage, canRead, canWrite, validEmail, validPassword, validUUID, validateRecord, collections } from './policy.mjs';
 const derive=promisify(scrypt);
 export function normalizeBusinessWebsite(value) {
@@ -28,9 +33,39 @@ async function bytes(request, maximum=1048576) {
  return Buffer.concat(chunks);
 }
 async function body(request) { return JSON.parse((await bytes(request)).toString('utf8')||'{}'); }
-export function createAPI(repo) { return { async fetch(request) {
+export function createAPI(repo, {billingEnforced=process.env.KENNELONE_BILLING_ENFORCEMENT==='true', verifyApple=verifyApplePurchase, verifyGoogle=verifyGooglePurchase, verifyAppleWebhook=verifyAppleNotification, verifyWindowsRenewal=verifyWindowsSubscriptionRenewal}={}) {
+ return { async fetch(request) {
  try {
  const url=new URL(request.url),path=url.pathname.replace(/^\/kennelflowapi(?=\/|$)/,'');
+ if(request.method==='POST'&&['/v2/billing/webhook/apple','/v2/billing/webhook/apple/sandbox'].includes(path)){
+   const input=JSON.parse((await bytes(request,131072)).toString('utf8')||'{}');
+   const environment=path.endsWith('/sandbox')?'sandbox':'production';
+   const verified=await verifyAppleWebhook(input.signedPayload,{environment});
+   if(verified.ignored)return response(200,{ok:true,ignored:true,test:verified.test===true});
+   const result=await repo.reconcileAppleEvent(verified);
+   return response(200,{ok:true,...result});
+ }
+ if(request.method==='POST'&&path==='/v2/billing/webhook/square'){
+   const event=validateSquareWebhook({
+    signature:request.headers.get('x-square-hmacsha256-signature'),
+    rawBody:await bytes(request,131072),
+    signatureKey:process.env.KO_SQUARE_WEBHOOK_SIGNATURE_KEY,
+    notificationUrl:process.env.KO_SQUARE_WEBHOOK_NOTIFICATION_URL,
+    // The public webhook URL is the signature basis; a trusted gateway may forward to an internal API URL.
+    requestUrl:process.env.KO_SQUARE_WEBHOOK_NOTIFICATION_URL
+   });
+   // A valid signature proves origin, NOT payment. Fetch current state from Square.
+   if(['refund.created','refund.updated'].includes(event.type)){
+    const refund=await verifySquareRefundWebhook(event);
+    if(refund.ignored)return response(200,{ok:true,ignored:true});
+    const status=await repo.reconcileSquareRefundEvent(refund);
+    return response(200,{ok:true,...status});
+   }
+   const verified=await verifySquareSubscriptionWebhook(event);
+   if(verified.ignored)return response(200,{ok:true,ignored:true});
+   const state=await repo.reconcileSquareSubscriptionEvent(verified);
+   return response(200,{ok:true,...state});
+  }
  if(request.method==='GET'&&path==='/v2/capabilities')return response(200,{version:2,employeeAccounts:true,revisionSync:true,collections});
  if(request.method==='POST'&&path==='/v2/signup') {
   const input=await body(request),email=String(input.email||'').trim().toLowerCase();
@@ -105,11 +140,87 @@ export function createAPI(repo) { return { async fetch(request) {
  }
  if(request.method==='POST'&&path==='/v2/logout'){await repo.logout(actor);return response(200,{ok:true})}
  if(request.method==='GET'&&path==='/v2/me')return response(200,{user:{id:actor.id,email:actor.email,name:actor.name},kennels:await repo.kennels(actor)});
+ if(request.method==='GET'&&path==='/v2/billing/status'){
+  const kennel=String(url.searchParams.get('kennel')||'').toLowerCase();
+  if(!validUUID(kennel))return response(400,{error:'Valid kennel required'});
+  if(!(await repo.kennels(actor)).some(k=>k.id===kennel))return response(403,{error:'Access denied'});
+  return response(200,{status:await repo.billingStatus(actor,kennel)});
+ }
+ if(request.method==='POST'&&path==='/v2/billing/link'){
+  const input=await body(request),kennel=String(input.kennel||'').toLowerCase();
+  if(!validUUID(kennel))return response(400,{error:'Valid kennel required'});
+  const member=(await repo.kennels(actor)).find(k=>k.id===kennel);
+  if(!member||member.role!=='owner')return response(403,{error:'Only the kennel owner can link purchases'});
+  const provider=input.provider;
+  if(!['apple','google'].includes(provider) || typeof input.proof!=='string'||input.proof.length>30000)
+   return response(400,{error:'Store and purchase proof required'});
+  const purchase=provider==='apple'
+   ?await verifyApple(input.proof)
+   :await verifyGoogle(input.proof);
+  const linked=await repo.linkVerifiedPurchase(actor,kennel,purchase);
+  return response(200,{ok:true,status:linked});
+ }
+ if(request.method==='POST'&&path==='/v2/billing/checkout'){
+  const input=await body(request),kennel=String(input.kennel||'').toLowerCase();
+  const plan=String(input.plan||'').toLowerCase();
+  if(!validUUID(kennel)||!['monthly','annual','lifetime'].includes(plan))
+   return response(400,{error:'Valid kennel and subscription plan required'});
+  const member=(await repo.kennels(actor)).find(k=>k.id===kennel);
+  if(!member||member.role!=='owner')return response(403,{error:'Only the kennel owner can start checkout'});
+  const entitlement=await repo.billingStatus(actor,kennel);
+  if(entitlement.active&&entitlement.state!=='trial')
+   return response(409,{error:'A subscription already covers this kennel. Do not pay again.'});
+  const pending=await repo.pendingWindowsCheckout(actor,kennel);
+  if(pending) {
+   if(pending.plan!==plan)return response(409,{error:'A checkout for another plan already exists. Finish or cancel it before changing plans.'});
+   return response(200,{checkout:pending,reused:true});
+  }
+  const idempotencyKey=randomUUID();
+  const link=await createWindowsPaymentLink({plan,kennelId:kennel,email:actor.email,idempotencyKey});
+  const saved=await repo.saveWindowsCheckout(actor,kennel,plan,idempotencyKey,link);
+  return response(201,{checkout:saved,reused:false});
+ }
+ if(request.method==='POST'&&path==='/v2/billing/checkout/confirm'){
+  const input=await body(request),kennel=String(input.kennel||'').toLowerCase();
+  if(!validUUID(kennel))return response(400,{error:'Valid kennel required'});
+  const member=(await repo.kennels(actor)).find(k=>k.id===kennel);
+  if(!member||member.role!=='owner')return response(403,{error:'Only the kennel owner can verify checkout'});
+  const pending=await repo.pendingWindowsCheckout(actor,kennel);
+  if(!pending)return response(200,{status:await repo.billingStatus(actor,kennel),pending:false});
+  // Square's own payment, order, and subscription APIs are the sole authority.
+  // No user-supplied payment ID or browser redirect can unlock a subscription.
+  const verified=await verifyPendingWindowsCheckout(pending);
+  const status=await repo.settleWindowsCheckout(actor,kennel,pending.orderId,verified);
+  return response(200,{status,pending:false});
+ }
+ if(request.method==='POST'&&path==='/v2/billing/refresh') {
+  const input=await body(request),kennel=String(input.kennel||'').toLowerCase();
+  if(!validUUID(kennel))return response(400,{error:'Valid kennel required'});
+  const member=(await repo.kennels(actor)).find(k=>k.id===kennel);
+  if(!member||member.role!=='owner')return response(403,{error:'Only the kennel owner can refresh the subscription'});
+  const checkout=await repo.windowsSubscriptionForRefresh(actor,kennel);
+  if(!checkout)return response(409,{error:'No previously verified Square subscription to refresh'});
+  const verified=await verifyWindowsRenewal(checkout);
+  if(verified.providerPurchaseId!==checkout.providerPurchaseId)
+    return response(403,{error:'Square subscription identity does not match'});
+  const status=await repo.refreshWindowsSubscription(actor,kennel,verified);
+  return response(200,{status});
+ }
+ // A checkout link alone grants nothing. Only verified Square settlement can
+ // write Windows entitlements. Do not add a browser-called 'mark as paid' route.
+
  const match=/^\/v2\/kennels\/([a-f0-9-]{36})\/(members|invitations|records|files|history|clock|private-messages)(?:\/([a-f0-9-]{36}))?$/.exec(path);
  if(!match||!validUUID(match[1]))return response(404,{error:'Not found'});
  const kennel=match[1],resource=match[2],id=match[3];
  const membership=(await repo.kennels(actor)).find(k=>k.id===kennel);
  if(!membership)return response(403,{error:'Access denied'});
+ if(billingEnforced) {
+  // All kennel resources, including employee invitations and record sync,
+  // share the kennel owner's verified entitlement. Non-paid sessions can
+  // still authenticate, view billing status and link a legitimate receipt.
+  const billing=await repo.billingStatus(actor,kennel);
+  if(billing?.active!==true)return response(402,{error:'An active Kennel One subscription or trial is required',billingStatus:billing||{active:false}});
+ }
  const role=membership.role;
  if(resource==='private-messages'&&!id&&['GET','POST'].includes(request.method)){
   if(!['owner','admin','staff'].includes(role))return response(403,{error:'Access denied'});
@@ -197,6 +308,9 @@ export function createAPI(repo) { return { async fetch(request) {
  return response(404,{error:'Not found'});
  }catch(e){
   if(e.code==='23514')return response(400,{error:'Check clock times and close the existing open entry before adding another'});
+  if(e.status===403)return response(403,{error:'Store purchase inactive or could not be verified'});
+  if(e.status===409)return response(409,{error:'Square has not confirmed a qualifying paid subscription yet'});
+  if(e.status===400)return response(400,{error:'Invalid purchase proof or request'});
   if(e.status===413)return response(413,{error:'Request too large'});
   if(e instanceof SyntaxError)return response(400,{error:'Invalid JSON'});
   if(e.code==='40001'||e.code==='23505')return response(409,{error:'Conflict; refresh before retrying'});

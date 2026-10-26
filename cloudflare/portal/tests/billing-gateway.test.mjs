@@ -1,0 +1,92 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {webcrypto} from 'node:crypto';
+import {handleDirect} from '../functions/api/[[path]].js';
+globalThis.crypto||=webcrypto;
+const origin='https://billing-preview.example';
+const scope='00000000-0000-0000-0000-000000000911';
+const foreign='00000000-0000-0000-0000-000000000912';
+const env={KO_SESSION_KEY:'ab'.repeat(32)};
+const input=(path,method='GET',data,cookie)=>new Request(origin+path,{
+ method,headers:{...(cookie?{Cookie:cookie}:{}),
+  ...(method==='POST'?{Origin:origin,'Sec-Fetch-Site':'same-origin','Content-Type':'application/json'}:{})},
+ body:data?JSON.stringify(data):method==='POST'?'{}':undefined
+});
+function backend(calls,role='owner'){
+ return async(url,options={})=>{
+  const path=new URL(url).pathname;
+  calls.push(path);
+  if(path==='/v2/login')return Response.json({token:'ab'.repeat(32)});
+  if(path==='/v2/me')return Response.json({user:{id:scope,email:'preview@example.invalid'},kennels:[{id:scope,role}]});
+  if(path==='/v2/billing/status')return Response.json({status:{active:true,provider:'google',plan:'annual'}});
+  if(path==='/v2/billing/refresh')return Response.json({status:{active:true,provider:'windows',plan:'monthly'}});
+  return Response.json({error:'not found'},{status:404});
+ };
+}
+test('Windows gateway sends signed-in member to server-backed billing status',async()=>{
+ const calls=[];
+ const auth=await handleDirect(input('/api/login','POST',{email:'preview@example.invalid',password:'example-not-a-real-secret'}),env,backend(calls));
+ assert.equal(auth.status,200);
+ const cookie=auth.headers.get('set-cookie').match(/__Host-ko_session=[\w-]+/)[0];
+ const status=await handleDirect(input('/api/billing/status?kennel='+scope,'GET',null,cookie),env,backend(calls));
+ assert.equal(status.status,200);
+ assert.deepEqual((await status.json()).status,{active:true,provider:'google',plan:'annual'});
+ assert(calls.includes('/v2/billing/status'));
+});
+test('foreign kennel cannot be used to query another customer subscription',async()=>{
+ const calls=[];
+ const auth=await handleDirect(input('/api/login','POST',{email:'preview@example.invalid',password:'example-not-a-real-secret'}),env,backend(calls));
+ const cookie=auth.headers.get('set-cookie').match(/__Host-ko_session=[\w-]+/)[0];
+ const status=await handleDirect(input('/api/billing/status?kennel='+foreign,'GET',null,cookie),env,backend(calls));
+ assert.equal(status.status,403);
+ assert(!calls.includes('/v2/billing/status'));
+});
+
+
+test('Windows billing gateway forwards owner renewal checks only after verifying kennel ownership',async()=>{
+ const calls=[];
+ const fetcher=backend(calls);
+ const auth=await handleDirect(input('/api/login','POST',{email:'preview@example.invalid',
+  password:'example-not-a-real-secret'}),env,fetcher);
+ const cookie=auth.headers.get('set-cookie').match(/__Host-ko_session=[\w-]+/)[0];
+ const r=await handleDirect(input('/api/billing/refresh','POST',{kennel:scope},cookie),env,fetcher);
+ assert.equal(r.status,200);
+ assert.equal((await r.json()).status.provider,'windows');
+ assert(calls.includes('/v2/billing/refresh'));
+});
+test('Windows billing gateway refuses employee or foreign kennel renewal requests',async()=>{
+ const staffCalls=[];
+ const staffFetcher=backend(staffCalls,'staff');
+ const auth=await handleDirect(input('/api/login','POST',{email:'preview@example.invalid',
+  password:'example-not-a-real-secret'}),env,staffFetcher);
+ const cookie=auth.headers.get('set-cookie').match(/__Host-ko_session=[\w-]+/)[0];
+ const staff=await handleDirect(input('/api/billing/refresh','POST',{kennel:scope},cookie),env,staffFetcher);
+ assert.equal(staff.status,403);
+ const foreignCheck=await handleDirect(input('/api/billing/refresh','POST',{kennel:foreign},cookie),env,staffFetcher);
+ assert.equal(foreignCheck.status,403);
+ assert(!staffCalls.includes('/v2/billing/refresh'));
+});
+
+
+test('Square callback requires a signature and forwards untouched JSON without customer sign-in',async()=>{
+ const payload=JSON.stringify({event_id:'event-test',type:'subscription.updated',data:{id:'sandbox-sub'}});
+ const target='/api/billing/webhook/square';
+ const seen=[];
+ const fetcher=async(url,options)=>{
+  seen.push({url,options});
+  return Response.json({ok:true,matched:false});
+ };
+ const makeRequest=signature=>new Request(origin+target,{
+  method:'POST',
+  headers:{'Content-Type':'application/json',...(signature?{'x-square-hmacsha256-signature':signature}:{})},
+  body:payload
+ });
+ const unsigned=await handleDirect(makeRequest(null),{},fetcher);
+ assert.equal(unsigned.status,403);assert.equal(seen.length,0);
+ const signed=await handleDirect(makeRequest('test-only-square-signature'),{},fetcher);
+ assert.equal(signed.status,200);
+ assert.equal(seen.length,1);
+ assert.equal(new URL(seen[0].url).pathname,'/v2/billing/webhook/square');
+ assert.equal(Buffer.from(seen[0].options.body).toString('utf8'),payload);
+ assert.equal(seen[0].options.headers['x-square-hmacsha256-signature'],'test-only-square-signature');
+});

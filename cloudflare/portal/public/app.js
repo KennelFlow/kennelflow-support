@@ -6,8 +6,54 @@ import {catalog,breedColors,breedCoats} from './catalog.mjs';
 import {models,collections,canRead,canWrite,newRecord,normalizedRow,recordName,compareDisplayRecords,validateModel,isoDate,uuid} from './records.mjs';
 const $=id=>document.getElementById(id);
 const labels={dogs:'Dogs',puppies:'Puppies',litters:'Litters',breedingRecords:'Breeding records',healthRecords:'Health records',puppyMedicalRecords:'Puppy medical records',customers:'Puppy buyers',clients:'Clients',tasks:'Tasks',training:'Training',equipment:'Equipment',kennels:'Kennels / areas',documents:'Photos & documents',contracts:'Contracts',payments:'Payments',groomingRecords:'Grooming',feedingPlans:'Feeding plans',supplementRecords:'Supplements',semenRecords:'Semen records',scanFolders:'Report folders',scannedReports:'Scanned reports',boardingRecords:'Boarding',calendarEvents:'Calendar events',employeeActivity:'Employee activity',staffTimeEntries:'Staff time entries',kennelCareSessions:'Kennel care',expenses:'Expenses',dailyDutyShifts:'Duty categories',dailyDutyTemplates:'Duty templates',dailyDutyRecords:'Duty records',smartTags:'QR / NFC assignments',inventoryLocations:'Inventory locations',inventoryItems:'Inventory items',travelManifests:'Travel manifests',inventoryScans:'Inventory scans',inventoryReports:'Inventory reports',smartPlacements:'Tag placements',maintenanceRecords:'Maintenance records',ofaXrays:'OFA / X-ray records',clinics:'Veterinary clinics',vetServices:'Veterinary services',employeeProfiles:'Employee profiles',messages:'Messages',locations:'Employee locations',pedigreeAncestors:'Pedigree ancestors',pedigreeScans:'Pedigree scans'};
-const groups={Overview:[],'Dogs':['dogs'],'Puppies & Litters':['puppies','litters'],'Breeding':['breedingRecords','semenRecords'],'Kennels & Care':['kennels','kennelCareSessions','equipment','maintenanceRecords'],'Clients & Boarding':['clients','boardingRecords','customers'],'Health & Grooming':['healthRecords','puppyMedicalRecords','groomingRecords','ofaXrays','clinics','vetServices'],'Feeding & Supplements':['feedingPlans','supplementRecords'],'Daily Duties':['dailyDutyRecords','dailyDutyTemplates','dailyDutyShifts'],'Calendar':['calendarEvents','tasks'],'Training':['training'],'Equipment & Inventory':['equipment','inventoryItems','inventoryLocations'],'Expenses & Payments':['expenses','payments'],'Contracts':['contracts'],'Photos & Documents':['documents','scannedReports','scanFolders'],'QR / NFC':['smartTags','smartPlacements'],'Travel & Reports':['travelManifests','inventoryScans','inventoryReports','pedigreeAncestors','pedigreeScans'],'Staff Records':['employeeActivity','staffTimeEntries','employeeProfiles','messages','locations'],'Employees':[]};
-const referenceTypes={puppyID:['puppies'],litterID:['litters'],linkedLitterID:['litters'],linkedDogID:['dogs'],linkedPuppyID:['puppies'],dogID:['dogs'],kennelID:['kennels'],areaID:['kennels','inventoryLocations'],vehicleAreaID:['inventoryLocations'],placementID:['smartPlacements'],clientID:['clients'],templateID:['dailyDutyTemplates'],folderID:['scanFolders'],tagID:['smartTags'],containerTagID:['smartTags'],tripID:['travelManifests'],itemID:['inventoryItems']};
+const groups={
+  Overview:[],
+  'Dog Records':['dogs'],
+  'Puppy & Litter Records':['puppies','litters'],
+  'Breeding Management':['breedingRecords','semenRecords'],
+  'Kennel Operations':['kennels','kennelCareSessions'],
+  'Client Management':['clients','customers'],
+  'Boarding Management':['boardingRecords'],
+  'Health Records':['healthRecords','puppyMedicalRecords','ofaXrays','clinics','vetServices'],
+  'Grooming Records':['groomingRecords'],
+  'Nutrition & Supplements':['feedingPlans','supplementRecords'],
+  'Daily Operations':['dailyDutyRecords','dailyDutyTemplates','dailyDutyShifts'],
+  'Scheduling':['calendarEvents','tasks'],
+  'Dog Training Management':['training'],
+  'Maintenance Management':['maintenanceRecords'],
+  'Equipment & Inventory':['equipment','inventoryItems','inventoryLocations'],
+  'Financial Records':['expenses','payments'],
+  'Contracts & Agreements':['contracts'],
+  'Documents & Media':['documents','scannedReports','scanFolders'],
+  'Smart Tag Management':['smartTags','smartPlacements'],
+  'Travel & Reporting':['travelManifests','inventoryScans','inventoryReports','pedigreeAncestors','pedigreeScans'],
+  'Staff Management':['employeeActivity','staffTimeEntries','employeeProfiles','messages','locations'],
+  'Employee Management':[]
+};
+const moduleDescriptions={
+  'Dog Records':'Profiles, registrations, ownership and individual dog histories.',
+  'Puppy & Litter Records':'Litter planning, puppy profiles and development records.',
+  'Breeding Management':'Breeding history, pairing records and semen inventory.',
+  'Kennel Operations':'Kennel assignments, facility activity and care sessions.',
+  'Client Management':'Client directory, contact details, enrolled services and pet-care profiles.',
+  'Boarding Management':'Boarding reservations, occupancy, drop-off and pickup details.',
+  'Health Records':'Veterinary information, vaccinations and medical documentation.',
+  'Grooming Records':'Grooming services, visits and treatment records.',
+  'Nutrition & Supplements':'Feeding plans, supplements and dietary instructions.',
+  'Daily Operations':'Shift categories, duty assignments and completion records.',
+  Scheduling:'Events, scheduled tasks and operational reminders.',
+  'Dog Training Management':'Client dogs, training schedules, session packages and progress reports.',
+  'Maintenance Management':'Repairs, equipment conditions and maintenance history.',
+  'Equipment & Inventory':'Facility assets, inventory locations and stock details.',
+  'Financial Records':'Business expenses, payment entries and transaction records.',
+  'Contracts & Agreements':'Saved contracts and associated business documents.',
+  'Documents & Media':'Photos, digital files and scanned paperwork.',
+  'Smart Tag Management':'QR and NFC assignments, placements and scan records.',
+  'Travel & Reporting':'Travel manifests, reports and pedigree documentation.',
+  'Staff Management':'Team activities, time entries and internal work records.',
+  'Employee Management':'Team members, authorized access and invitations.'
+};
+const referenceTypes={clientID:['clients'],puppyID:['puppies'],litterID:['litters'],linkedLitterID:['litters'],linkedDogID:['dogs'],linkedPuppyID:['puppies'],dogID:['dogs'],kennelID:['kennels'],areaID:['kennels','inventoryLocations'],vehicleAreaID:['inventoryLocations'],placementID:['smartPlacements'],clientID:['clients'],templateID:['dailyDutyTemplates'],folderID:['scanFolders'],tagID:['smartTags'],containerTagID:['smartTags'],tripID:['travelManifests'],itemID:['inventoryItems']};
 let teamMembers=[];
 let rows=new Map(),identity=null,kennels=[],kennel='',role='',active='Overview',loading=false,loadSequence=0,editor=null,saving=false;
 let month=new Date(new Date().getFullYear(),new Date().getMonth(),1),selectedDay='';
@@ -35,10 +81,108 @@ async function init(){
     $('kennel').replaceChildren(...kennels.map(k=>{const o=el('option',k.name);o.value=k.id;return o}));
     if(!kennels.some(k=>k.id===kennel))kennel=kennels[0]?.id||'';
     $('kennel').value=kennel;
-    $('login').hidden=true;$('workspace').hidden=false;
+    $('login').hidden=true;$('signup').hidden=true;$('workspace').hidden=false;
     if(!kennel){role='';rows.clear();message('This account has no active kennel. Ask your owner for a Business invitation.');render();return}
     await load();
-  }catch(e){$('login').hidden=false;$('workspace').hidden=true;setConnection('Sign in to connect');if(e.status!==401)message(e.message)}
+    await refreshSubscriptionBanner();
+    const args=new URLSearchParams(window.location.search);
+    if(args.get('checkout')==='return'){
+      args.delete('checkout');
+      const suffix=args.toString();
+      window.history.replaceState(null,'',window.location.pathname+(suffix?'?'+suffix:''));
+      const banner=$('subscriptionBanner');
+      if(banner && !banner.hidden && role==='owner'){
+        // Never grant access based on Square redirect alone. The customer must
+        // request an authenticated server verification of the stored checkout.
+        const check=[...banner.querySelectorAll('button')].find(b=>b.textContent==='Check payment and unlock access');
+        if(check)check.click();
+      }
+    }
+  }catch(e){$('login').hidden=signupMode||invitationMode;$('signup').hidden=!signupMode;$('workspace').hidden=true;setConnection('Sign in to connect');if(e.status!==401)message(e.message)}
+}
+async function refreshSubscriptionBanner(){
+  const banner=$('subscriptionBanner');
+  if(!kennel){banner.hidden=true;return}
+  try {
+    const {status}=await api('billing/status?kennel='+encodeURIComponent(kennel));
+    banner.hidden=false;
+    banner.replaceChildren();
+    if(status.active){
+      banner.append(el('strong',status.state==='trial'?'Kennel One free trial active':'Kennel One subscription active'));
+      if(status.validThrough)banner.append(el('p','Access through '+new Date(status.validThrough).toLocaleDateString()+'.'));
+      else if(status.plan==='lifetime')banner.append(el('p','Lifetime access active.'));
+      if(status.state==='trial')banner.append(el('p','You can choose a paid plan during your trial. Square will charge when you check out; the free trial itself does not automatically charge a card.'));
+    }
+    if(!status.active){
+      banner.append(el('strong','Subscription needed'));
+      banner.append(el('p','If you have already purchased Kennel One on iPhone or Android, link that purchase to this account before paying again.'));
+    }
+    if(role==='owner'&&(status.provider==='windows'||!status.active)){
+      const refresh=button('Refresh existing Square subscription',async()=>{
+        refresh.disabled=true;
+        refresh.textContent='Checking Square…';
+        try {
+          const result=await api('billing/refresh',{method:'POST',
+            headers:{'Content-Type':'application/json'},body:JSON.stringify({kennel})});
+          if(result.status?.active){
+            await refreshSubscriptionBanner();
+            await load();
+          }else message('A current paid Square subscription was not confirmed.');
+        }catch(error){
+          message(error.status===409
+            ?'Square cannot confirm a current paid renewal yet. No access changes were made.'
+            :error.message);
+        }finally{refresh.disabled=false;refresh.textContent='Refresh existing Square subscription'}
+      },'secondary');
+      banner.append(el('p','Already subscribed through Square? Check payment status before buying another plan.','muted'),refresh);
+    }
+    if(role==='owner'&&(!status.active||status.state==='trial')){
+        const plans=el('div',undefined,'billing-plans');
+        const notice=el('p','', 'muted');
+        banner.append(el('p','Square charges at checkout. Monthly $10.99 and yearly $99.99 renew automatically until canceled; lifetime $299.99 is a one-time purchase. Manage or cancel recurring billing using Square’s subscription email.','muted'));
+        for(const [plan,label] of [['monthly','$10.99 monthly'],['annual','$99.99 yearly'],['lifetime','$299.99 lifetime']]){
+          plans.append(button(label,async()=>{
+            plans.querySelectorAll('button').forEach(b=>b.disabled=true);
+            notice.textContent='Opening secure Square checkout…';
+            try {
+              const {checkout}=await api('billing/checkout',{method:'POST',
+                headers:{'Content-Type':'application/json'},body:JSON.stringify({kennel,plan})});
+              const u=new URL(checkout.url);
+              if(u.protocol!=='https:'||!(u.hostname==='square.link'||u.hostname.endsWith('.square.link')||
+                 u.hostname==='checkout.square.site'||u.hostname==='square.site'))throw Error('Unrecognized payment provider');
+              window.location.assign(u.href);
+            }catch(error){
+              notice.textContent=error.message;
+              plans.querySelectorAll('button').forEach(b=>b.disabled=false);
+            }
+          },'secondary'));
+        }
+        const check=button('Check payment and unlock access',async()=>{
+          check.disabled=true;
+          notice.textContent='Verifying your checkout directly with Square…';
+          try{
+            const result=await api('billing/checkout/confirm',{method:'POST',
+              headers:{'Content-Type':'application/json'},body:JSON.stringify({kennel})});
+            if(result.status?.active===true){
+              notice.textContent='Payment verified. Kennel One access is active.';
+              await refreshSubscriptionBanner();
+              await load();
+            }else{
+              notice.textContent='No active payment was found yet. Check again after completing checkout.';
+            }
+          }catch(error){
+            notice.textContent=error.status===409
+              ?'Square has not confirmed an eligible completed payment yet. If you paid, check again shortly.'
+              :error.message;
+          }finally{check.disabled=false}
+        },'secondary');
+        const waiting=el('p','A checkout link is not proof of payment. Only Square confirmation will unlock Kennel One.','muted');
+        banner.append(plans,check,notice,waiting);
+    }
+  }catch(e){
+    banner.hidden=false;
+    banner.replaceChildren(el('p','Subscription verification is not available yet. Your existing access is unchanged.'));
+  }
 }
 async function load(silent=false){
   if(!kennel||invitationMode)return;
@@ -67,24 +211,57 @@ async function load(silent=false){
   }catch(e){if(sequence===loadSequence){setConnection(e.status===401?'Sign in again':'Connection interrupted');if(!silent||e.status===401)message(e.message);if(e.status===401)requireLogin()}}
   finally{if(sequence===loadSequence){loading=false;$('refresh').disabled=false}}
 }
-function visibleGroups(){return Object.entries(groups).filter(([name,types])=>name==='Overview'||name==='Employees'&&!!role||types.some(t=>canRead(role,t)))}
-function selectSection(name){if(name!=='QR / NFC'){stopScanner?.();stopScanner=null}active=name;selectedDay='';renderNav();renderPanel()}
+function visibleGroups(){return Object.entries(groups).filter(([name,types])=>name==='Overview'||name==='Employee Management'&&!!role||types.some(t=>canRead(role,t)))}
+function selectSection(name){if(name!=='Smart Tag Management'){stopScanner?.();stopScanner=null}active=name;selectedDay='';renderNav();renderPanel()}
 function chooseCollection(type){const group=Object.entries(groups).find(([,types])=>types.includes(type));if(!group||!canRead(role,type))return;active=group[0];renderNav();renderPanel();$('collection').value=type;renderList()}
 function renderNav(){
-  $('nav').replaceChildren();
+  const menu=$('nav');menu.replaceChildren();
   if(!visibleGroups().some(([name])=>name===active))active='Overview';
-  for(const [name] of visibleGroups()){const b=button(name,()=>selectSection(name),'');b.classList.toggle('active',name===active);b.setAttribute('aria-current',name===active?'page':'false');$('nav').append(b)}
+  menu.append(el('div','MANAGEMENT SECTIONS','nav-heading'));
+  for(const [name] of visibleGroups()){
+    const b=button(name,()=>selectSection(name),'');
+    b.classList.toggle('active',name===active);
+    b.setAttribute('aria-current',name===active?'page':'false');
+    b.setAttribute('title',moduleDescriptions[name]||'Operations overview');
+    menu.append(b);
+  }
 }
 function render(background=false){renderNav();renderOverview();renderPanel(background)}
 function renderOverview(){
-  const box=$('overview');box.replaceChildren();const intro=el('section',undefined,'intro');intro.append(el('p','ONE CONNECTED KENNEL','eyebrow'),el('h2','Your records, wherever you work'),el('p','Manage shared records here and continue in the Kennel One app. Open devices check for updates automatically. If both devices change a record, you choose which changes to keep.'));box.append(intro);
+  const box=$('overview');box.replaceChildren();
+  const intro=el('section',undefined,'intro corporate-intro');
+  const introContent=el('div',undefined,'intro-content');
+  introContent.append(
+    el('p','KENNEL MANAGEMENT PLATFORM','eyebrow'),
+    el('h2','Centralized Kennel Operations'),
+    el('p','Manage records, staff activity, and day-to-day kennel operations from one secure business dashboard. Keep your organization aligned across devices with shared access to essential information.')
+  );
+  intro.append(introContent);
+  box.append(intro);
+  const sectionHeader=el('div',undefined,'module-section-header');
+  const headingGroup=el('div');
+  headingGroup.append(el('p','WORKSPACE DIRECTORY','eyebrow'),el('h2','Management Sections'));
+  sectionHeader.append(headingGroup,el('p','Select a department to view its authorized records and operational tools.','muted'));
+  box.append(sectionHeader);
   const grid=el('div',undefined,'metrics');
-  for(const [name,types] of visibleGroups().filter(([name])=>name!=='Overview')){const b=button('',()=>selectSection(name),'metric'),count=[...rows.values()].filter(r=>types.includes(r.type)&&!r.deleted_at).length;b.append(el('h3',name),el('strong',name==='Employees'?(['owner','admin'].includes(role)?String(teamMembers.length):'Open'):String(count)),el('span',name==='Employees'?(['owner','admin'].includes(role)?'Team members':'Time & work history'):'Shared records'));grid.append(b)}
+  let index=0;
+  for(const [name,types] of visibleGroups().filter(([name])=>name!=='Overview')){
+    const isEmployees=name==='Employee Management';
+    const count=isEmployees?(['owner','admin'].includes(role)?teamMembers.length:null):[...rows.values()].filter(r=>types.includes(r.type)&&!r.deleted_at).length;
+    const card=button('',()=>selectSection(name),'metric');
+    card.setAttribute('aria-label',name+(count===null?'':', '+count+' records')+', open section');
+    const upper=el('div',undefined,'metric-upper');
+    upper.append(el('span',String(++index).padStart(2,'0'),'metric-index'),el('span','OPEN SECTION ↗','metric-open'));
+    card.append(upper,el('h3',name),el('p',moduleDescriptions[name]||'Authorized business records.','metric-description'));
+    const foot=el('div',undefined,'metric-footer');
+    foot.append(el('strong',count===null?'—':String(count),'metric-number'),el('span',isEmployees?'Team members':'Active records'));
+    card.append(foot);grid.append(card);
+  }
   box.append(grid);
-  if(!rows.size)box.append(el('p','No shared records yet. Connect this Business account in your app and sync existing records, or add a record here.','card'));
+  if(!rows.size)box.append(el('p','No shared records are loaded yet. Connect your existing Business account in the Kennel One app and sync, or add a record here.','card overview-empty'));
 }
 function renderPanel(background=false){
-  const overview=active==='Overview',staff=active==='Employees';$('overview').hidden=!overview;$('recordsPanel').hidden=overview||staff;$('employeesPanel').hidden=!staff;if(staff){employees.render(background);return}if(overview)return;
+  const overview=active==='Overview',staff=active==='Employee Management';$('overview').hidden=!overview;$('recordsPanel').hidden=overview||staff;$('employeesPanel').hidden=!staff;if(staff){employees.render(background);return}if(overview)return;
   const selection=$('collection').value,types=groups[active].filter(t=>canRead(role,t));
   $('collection').replaceChildren(...types.map(t=>{const o=el('option',labels[t]);o.value=t;return o}));
   if(types.includes(selection))$('collection').value=selection;
@@ -94,7 +271,15 @@ function chosen(){return $('collection').value}
 function renderList(){
   const type=chosen(),term=$('search').value.trim().toLowerCase(),deleted=$('deleted').checked;
   $('add').hidden=!canWrite(role,type);$('add').textContent='Add '+(labels[type]||'record').toLowerCase();
+
   let list=[...rows.values()].filter(r=>r.type===type&&(deleted?!!r.deleted_at:!r.deleted_at)&&(!term||JSON.stringify(r.record).toLowerCase().includes(term)));
+  const category=window.__kennelClientCategory||'All clients';
+  if(type==='clients'&&category!=='All clients'){
+    list=list.filter(r=>(r.record?.services||'').split(',').map(x=>x.trim()).includes(category));
+  }
+  renderClientPanel(type);
+  renderTrainingPanel(type);
+  if(type==='training'&&window.__kennelTrainingClient)list=list.filter(r=>String(r.record.clientID||'').toLowerCase()===window.__kennelTrainingClient.toLowerCase());
   renderCalendar(type,list);
   renderSpecialized(type,list);
   if(type==='calendarEvents'&&!deleted){ $('list').replaceChildren();$('count').textContent=selectedDay?'Schedule for '+selectedDay:'Choose a date';return }
@@ -108,7 +293,9 @@ function renderList(){
     if(canWrite(role,type)&&row.record){actions.append(button(row.deleted_at?'Restore':'Edit',()=>row.deleted_at?restore(row):openEditor(row)));if(!row.deleted_at)actions.append(button('Delete',()=>remove(row),'danger'))}
     if(!row.deleted_at&&['documents','scannedReports'].includes(type)&&['owner','admin'].includes(role)){actions.append(button('Download',()=>download(row)));actions.append(button('Replace file',()=>replaceFile(row)));}
     if(!row.deleted_at&&type==='tasks'&&canWrite(role,type))actions.append(button(row.record.completed?'Reopen':'Complete',()=>toggleCompleted(row)));
-    if(!row.deleted_at){actions.append(button(type==='payments'?'Receipt':'Print record',()=>showReport(type==='payments'?'Payment receipt':recordName(row.record),[[labels[type],[row.record]]])));if(type==='dogs')workflows.dogActions(row,actions);if(type==='smartTags')actions.append(button('View / print QR',()=>showTagQR(row)));if(canWrite(role,'documents')&&!['documents','scannedReports'].includes(type))actions.append(button('Attach photo / document',()=>attachDocument(row)))}
+    if(!row.deleted_at){actions.append(button(type==='payments'?'Receipt':'Print record',()=>showReport(type==='payments'?'Payment receipt':recordName(row.record),[[labels[type],[row.record]]])));if(type==='dogs')workflows.dogActions(row,actions);if(type==='smartTags')actions.append(button('View / print QR',()=>showTagQR(row)));if(['clients','training','boardingRecords'].includes(type))actions.append(button('Share',()=>shareRecord(row)));
+      if(type==='training'&&canWrite(role,'calendarEvents'))actions.append(button('Schedule session',()=>scheduleTraining(row)));
+      if(canWrite(role,'documents')&&!['documents','scannedReports'].includes(type))actions.append(button('Attach photo / document',()=>attachDocument(row)))}
     head.append(text,actions);card.append(head);
     const detail=el('details',undefined,'detail-block');detail.append(el('summary','View record details'));const dl=el('dl');
     for(const [key,value] of Object.entries(row.record||{})){if(key==='id'||value==null||value==='')continue;dl.append(el('dt',human(key)),el('dd',displayValue(value,key)))}detail.append(dl);card.append(detail);
@@ -359,6 +546,99 @@ function renderSpecialized(type,list){
   }
 }
 
+
+function clientRows(){
+  return [...rows.values()].filter(r=>r.type==='clients'&&!r.deleted_at);
+}
+function renderClientPanel(type){
+  const panel=$('clientTools');panel.replaceChildren();panel.hidden=type!=='clients';
+  if(type!=='clients')return;
+  const head=el('div',undefined,'directory-intro');
+  head.append(el('h3','Client Directory'),el('p','Manage each client’s contact information, pets, medical instructions and enrolled services.','muted'));
+  panel.append(head);
+  const toolbar=el('div',undefined,'directory-toolbar');
+  const label=el('label','Filter by service');
+  const filter=el('select');filter.id='clientServiceFilter';
+  const current=window.__kennelClientCategory||'All clients';
+  for(const option of ['All clients','Boarding','Grooming','Training']){
+    const entry=el('option',option);entry.value=option;filter.append(entry);
+  }
+  filter.value=current;
+  filter.addEventListener('change',()=>{window.__kennelClientCategory=filter.value;renderList()});
+  label.append(filter);toolbar.append(label);
+  if(canWrite(role,'clients'))toolbar.append(button('Add client',()=>{
+    const value=newRecord('ClientRecord');
+    if(current!=='All clients')value.services=current;
+    openEditor(null,'clients',value)
+  }));
+  toolbar.append(button('Print client directory',()=>{
+    const all=clientRows().filter(r=>current==='All clients'||(r.record.services||'').split(',').map(s=>s.trim()).includes(current));
+    showReport('Client Directory', [['Client Profiles',all.map(r=>r.record)]]);
+  },'secondary'));
+  panel.append(toolbar);
+  const totals=el('div',undefined,'directory-totals');
+  for(const category of ['All clients','Boarding','Grooming','Training']){
+    const n=clientRows().filter(r=>category==='All clients'||(r.record.services||'').split(',').map(s=>s.trim()).includes(category)).length;
+    totals.append(el('span',category+': '+n,'directory-stat'));
+  }
+  panel.append(totals);
+}
+function renderTrainingPanel(type){
+  const panel=$('trainingTools');panel.replaceChildren();panel.hidden=type!=='training';
+  if(type!=='training')return;
+  const head=el('div',undefined,'directory-intro');
+  head.append(el('h3','Client Dog Training'),el('p','Track clients, dogs, trainers, booked sessions, packages, goals and progress in one training workspace.','muted'));
+  panel.append(head);
+  const toolbar=el('div',undefined,'directory-toolbar');
+  const clientLabel=el('label','Training client');
+  const pick=el('select');pick.id='trainingClientFilter';
+  let opt=el('option','All training clients');opt.value='';pick.append(opt);
+  for(const client of clientRows()){
+    opt=el('option',client.record.name);opt.value=client.id;pick.append(opt)
+  }
+  pick.value=window.__kennelTrainingClient||'';
+  pick.addEventListener('change',()=>{window.__kennelTrainingClient=pick.value;renderList()});
+  clientLabel.append(pick);toolbar.append(clientLabel);
+  if(canWrite(role,'training'))toolbar.append(button('Add training record',()=>openEditor(null,'training')));
+  if(canWrite(role,'calendarEvents'))toolbar.append(button('Book training session',()=>scheduleTraining()));
+  panel.append(toolbar);
+  const records=[...rows.values()].filter(r=>r.type==='training'&&!r.deleted_at);
+  const packages=new Map();
+  for(const row of records){
+    const key=(row.record?.packageName||'').trim();if(!key)continue;
+    const value=packages.get(key)||{count:0,sessions:0};
+    value.count++;value.sessions+=Number(row.record.packageSessions||0);packages.set(key,value);
+  }
+  if(packages.size){
+    const box=el('div',undefined,'package-summary');
+    box.append(el('h4','Training packages','package-heading'));
+    const grid=el('div',undefined,'package-grid');
+    for(const [name,stat] of packages)grid.append(el('div',name+' · '+stat.count+' record'+(stat.count===1?'':'s'),'directory-stat'));
+    box.append(grid);panel.append(box);
+  }
+}
+async function shareRecord(row){
+  const display=Object.entries(row.record||{}).filter(([k,v])=>k!=='id'&&v!=null&&v!=='').map(([key,value])=>human(key)+': '+displayValue(value,key)).join('\n');
+  const title='Kennel One · '+recordName(row.record);
+  try{
+    if(navigator.share)await navigator.share({title,text:title+'\n'+display});
+    else if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(title+'\n'+display);message('Record details copied for sharing.')}
+    else showReport(title,[[labels[row.type],[row.record]]]);
+  }catch(error){if(error?.name!=='AbortError')message('Sharing unavailable: '+error.message)}
+}
+function scheduleTraining(row){
+  const draft=newRecord('KennelCalendarEvent');
+  const record=row?.record||{};
+  draft.title='Training · '+(record.dogName||'Client dog');
+  draft.category='Training';
+  draft.startDate=record.nextSession||record.date||isoDate(Date.now());
+  draft.endDate=isoDate(new Date(Date.parse(draft.startDate)+Math.max(15,record.durationMinutes||60)*60000));
+  draft.notes=[record.packageName&&'Package: '+record.packageName,record.trainerName&&'Trainer: '+record.trainerName,record.trainingGoals].filter(Boolean).join('\n');
+  draft.linkedType='TrainingRecord';
+  if(row)draft.linkedID=row.id;
+  openEditor(null,'calendarEvents',draft);
+}
+
 function displayValue(value,key){if(typeof value==='boolean')return value?'Yes':'No';if(Array.isArray(value))return value.map(x=>typeof x==='object'?Object.entries(x).filter(([k])=>k!=='id').map(([k,v])=>human(k)+': '+displayValue(v,k)).join(' · '):String(x)).join('\n');if(typeof value==='object')return JSON.stringify(value);if(typeof value==='string'&&/^\d{4}-\d\d-\d\dT/.test(value))return new Date(value).toLocaleString();return String(value)}
 function renderCalendar(type,list){
   const box=$('calendar');box.replaceChildren();if(type!=='calendarEvents'||$('deleted').checked)return;
@@ -387,6 +667,17 @@ function renderObject(model,object,parent){
     if(field.key==='id'||(['documents','scannedReports'].includes(editor?.type)&&field.key==='fileName'))continue;
     const label=el('label',human(field.key)),value=object[field.key],type=field.type;
     if(type.startsWith('[')){parent.append(renderArray(field,object));continue}
+    if(model==='ClientRecord'&&field.key==='services'){
+      const wrap=el('fieldset',undefined,'wide service-selector'),legend=el('legend','Client services');
+      wrap.append(legend,el('p','Select all services this client uses.','muted'));
+      for(const category of ['Boarding','Grooming','Training']){
+        const item=el('label',undefined,'check');
+        const input=el('input');input.type='checkbox';input.checked=(object.services||'').split(',').map(x=>x.trim()).includes(category);
+        input.addEventListener('change',()=>{const values=new Set((object.services||'').split(',').map(x=>x.trim()).filter(Boolean));input.checked?values.add(category):values.delete(category);object.services=[...values].join(', ');dirty()});
+        item.append(input,document.createTextNode(category));wrap.append(item);
+      }
+      parent.append(wrap);continue;
+    }
     let control;
     if(field.key==='assignedTo'&&teamMembers.length){
       control=el('select');const blank=el('option','Unassigned');blank.value='';control.append(blank);
@@ -405,7 +696,7 @@ function renderObject(model,object,parent){
       }
       for(const [v,text] of options){const option=el('option',text);option.value=v;control.append(option)}control.value=value==null?'':String(value);
     }else if(type==='Bool'){control=el('input');control.type='checkbox';control.checked=!!value;label.classList.add('check')}
-    else if(type==='String'&&/notes|instructions|text|description|detail|body|plan/i.test(field.key)){control=el('textarea');control.value=value||'';label.classList.add('wide')}
+    else if(type==='String'&&/notes|instructions|text|description|detail|body|plan|medications|allergies|homework|goals/i.test(field.key)){control=el('textarea');control.value=value||'';label.classList.add('wide')}
     else {control=el('input');control.type=type==='Date'?'datetime-local':['Double','Int','Int64'].includes(type)?'number':field.key.toLowerCase().includes('email')?'email':'text';if(type==='Date')control.step='1';if(control.type==='number')control.step=type==='Double'?'any':'1';control.value=value==null?'':type==='Date'?dateInput(value):String(value)}
     control.required=!field.optional&&type!=='Bool';control.dataset.field=field.key;
     const pickerOptions=field.key==='breed'?catalog.recognizedBreeds:field.key==='color'?breedColors(object.breed):field.key==='coat'?breedCoats(object.breed):field.key.toLowerCase().includes('registrationorganization')||field.key==='registry'?catalog.registries:field.key==='sex'?['Male','Female','Unknown']:null;
@@ -548,8 +839,23 @@ $('print').insertAdjacentElement('afterend',exportButton);
 window.addEventListener('beforeunload',e=>{if(editor?.dirty){e.preventDefault();e.returnValue=''}});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&identity&&!loading&&!saving)load(true)});
 setInterval(()=>{if(!document.hidden&&identity&&!loading&&!saving&&!$('reauth').open)load(true)},15000);
-let invitationMode=false;
-function showJoin(){invitationMode=true;$('join').hidden=false;$('login').hidden=true;$('workspace').hidden=true}
+let invitationMode=false,signupMode=false;
+function showSignup(){signupMode=true;invitationMode=false;$('signup').hidden=false;$('join').hidden=true;$('login').hidden=true;$('workspace').hidden=true;message('');}
+$('showSignup').onclick=showSignup;
+$('signupBack').onclick=()=>{signupMode=false;$('signup').hidden=true;$('login').hidden=false;message('')};
+$('signupForm').onsubmit=async e=>{
+ e.preventDefault();$('signupSubmit').disabled=true;$('signupStatus').textContent='';
+ try {
+  const email=$('signupEmail').value.trim().toLowerCase();
+  await api('signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+   email,password:$('signupPassword').value,name:$('signupName').value.trim(),kennelName:$('signupKennel').value.trim()
+  })});
+  $('signupPassword').value='';signupMode=false;$('signup').hidden=true;$('login').hidden=false;
+  $('email').value=email;message('Account created. Sign in to use your free trial.');
+ }catch(error){$('signupStatus').textContent=error.message;}
+ finally{$('signupSubmit').disabled=false}
+};
+function showJoin(){signupMode=false;$('signup').hidden=true;invitationMode=true;$('join').hidden=false;$('login').hidden=true;$('workspace').hidden=true}
 $('showJoin').onclick=showJoin;
 $('joinBack').onclick=()=>{invitationMode=false;$('join').hidden=true;$('joinPassword').value='';init()};
 $('joinForm').onsubmit=async e=>{e.preventDefault();$('joinSubmit').disabled=true;try{await api('invitations/accept',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:$('joinToken').value.trim(),email:$('joinEmail').value.trim(),name:$('joinName').value.trim(),password:$('joinPassword').value})});await api('logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});employees.reset();identity=null;rows.clear();teamMembers=[];kennel='';role='';invitationMode=false;$('joinPassword').value='';$('joinToken').value='';$('join').hidden=true;$('login').hidden=false;message('Invitation accepted. Sign in with your Business account to start work.');$('email').value=$('joinEmail').value}catch(e){$('joinPassword').value='';$('joinStatus').textContent=e.message}finally{$('joinSubmit').disabled=false}};

@@ -419,6 +419,76 @@ export const models = {
       "type": "String",
       "optional": false,
       "default": ""
+    },
+    {
+      "key": "clientID",
+      "type": "UUID",
+      "optional": true
+    },
+    {
+      "key": "packageName",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "packageSessions",
+      "type": "Int",
+      "optional": true
+    },
+    {
+      "key": "sessionsCompleted",
+      "type": "Int",
+      "optional": true
+    },
+    {
+      "key": "packagePrice",
+      "type": "Double",
+      "optional": true
+    },
+    {
+      "key": "packageStatus",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "trainerName",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "dogBreed",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "nextSession",
+      "type": "Date",
+      "optional": true
+    },
+    {
+      "key": "sessionStatus",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "trainingGoals",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "progressNotes",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "homework",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "behaviorNotes",
+      "type": "String",
+      "optional": true
     }
   ],
   "EquipmentItem": [
@@ -1355,6 +1425,96 @@ export const models = {
       "type": "String",
       "optional": false,
       "default": ""
+    },
+    {
+      "key": "services",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "petName",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "petBreed",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "petDOB",
+      "type": "Date",
+      "optional": true
+    },
+    {
+      "key": "petSex",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "petWeight",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "petMicrochip",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "feedingPlan",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "medications",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "medicationSchedule",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "allergies",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "vaccinationNotes",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "veterinarian",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "veterinarianPhone",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "behaviorNotes",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "groomingInstructions",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "trainingGoals",
+      "type": "String",
+      "optional": true
+    },
+    {
+      "key": "specialCareInstructions",
+      "type": "String",
+      "optional": true
     }
   ],
   "BoardingRecord": [

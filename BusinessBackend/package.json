@@ -6,10 +6,11 @@
     "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
+    "@apple/app-store-server-library": "^3.1.0",
+    "google-auth-library": "^10.9.1",
     "pg": "^8.16.3"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.14"
   }
 }
-
