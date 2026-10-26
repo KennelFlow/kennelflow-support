@@ -186,6 +186,37 @@ async function direct(request,env={},fetcher=fetch) {
     return forward(await upstream('/v2/business-profile',token,'PATCH',input,false,fetcher));
   }
   if(path==='/api/me'&&method==='GET')return forward(await upstream('/v2/me',token,'GET',undefined,false,fetcher));
+  if(path==='/api/billing/status'&&method==='GET'){
+    const scope=String(u.searchParams.get('kennel')||'').toLowerCase();
+    if(!uuid(scope))throw fail(400,'Invalid kennel ID');
+    await membership(token,scope,fetcher);
+    return forward(await upstream('/v2/billing/status?kennel='+encodeURIComponent(scope),token,'GET',undefined,false,fetcher));
+  }
+  if(path==='/api/billing/link'&&method==='POST'){
+    const input=await parseJSON(request,40000),scope=String(input.kennel||'').toLowerCase();
+    if(!uuid(scope)||!['apple','google'].includes(input.provider)||
+       typeof input.proof!=='string'||!input.proof||input.proof.length>30000)
+       throw fail(400,'Invalid purchase proof');
+    const member=await membership(token,scope,fetcher);
+    if(member.role!=='owner')throw fail(403,'Only the kennel owner can link purchases');
+    return forward(await upstream('/v2/billing/link',token,'POST',{kennel:scope,provider:input.provider,proof:input.proof},false,fetcher));
+  }
+  if(path==='/api/billing/checkout'&&method==='POST'){
+    const input=await parseJSON(request,16384),scope=String(input.kennel||'').toLowerCase();
+    if(!uuid(scope)||!['monthly','annual','lifetime'].includes(input.plan))
+     throw fail(400,'Select a valid Kennel One subscription');
+    const member=await membership(token,scope,fetcher);
+    if(member.role!=='owner')throw fail(403,'Only the kennel owner can start checkout');
+    return forward(await upstream('/v2/billing/checkout',token,'POST',{kennel:scope,plan:input.plan},false,fetcher));
+  }
+  if(path==='/api/billing/checkout/confirm'&&method==='POST'){
+    const input=await parseJSON(request,16384),scope=String(input.kennel||'').toLowerCase();
+    if(!uuid(scope))throw fail(400,'Invalid kennel ID');
+    const member=await membership(token,scope,fetcher);
+    if(member.role!=='owner')throw fail(403,'Only the kennel owner can check payment');
+    return forward(await upstream('/v2/billing/checkout/confirm',token,'POST',{kennel:scope},false,fetcher));
+  }
+
   if(path==='/api/kennels'&&method==='GET'){
     const r=await upstream('/v2/me',token,'GET',undefined,false,fetcher),v=await r.json();
     return jsonResponse(r.status,r.status===200?{kennels:v.kennels}:v);

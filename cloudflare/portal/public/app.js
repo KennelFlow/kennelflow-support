@@ -81,10 +81,87 @@ async function init(){
     $('kennel').replaceChildren(...kennels.map(k=>{const o=el('option',k.name);o.value=k.id;return o}));
     if(!kennels.some(k=>k.id===kennel))kennel=kennels[0]?.id||'';
     $('kennel').value=kennel;
-    $('login').hidden=true;$('workspace').hidden=false;
+    $('login').hidden=true;$('signup').hidden=true;$('workspace').hidden=false;
     if(!kennel){role='';rows.clear();message('This account has no active kennel. Ask your owner for a Business invitation.');render();return}
     await load();
-  }catch(e){$('login').hidden=false;$('workspace').hidden=true;setConnection('Sign in to connect');if(e.status!==401)message(e.message)}
+    await refreshSubscriptionBanner();
+    const args=new URLSearchParams(window.location.search);
+    if(args.get('checkout')==='return'){
+      args.delete('checkout');
+      const suffix=args.toString();
+      window.history.replaceState(null,'',window.location.pathname+(suffix?'?'+suffix:''));
+      const banner=$('subscriptionBanner');
+      if(banner && !banner.hidden && role==='owner'){
+        // Never grant access based on Square redirect alone. The customer must
+        // request an authenticated server verification of the stored checkout.
+        const check=[...banner.querySelectorAll('button')].find(b=>b.textContent==='Check payment and unlock access');
+        if(check)check.click();
+      }
+    }
+  }catch(e){$('login').hidden=signupMode||invitationMode;$('signup').hidden=!signupMode;$('workspace').hidden=true;setConnection('Sign in to connect');if(e.status!==401)message(e.message)}
+}
+async function refreshSubscriptionBanner(){
+  const banner=$('subscriptionBanner');
+  if(!kennel){banner.hidden=true;return}
+  try {
+    const {status}=await api('billing/status?kennel='+encodeURIComponent(kennel));
+    banner.hidden=false;
+    banner.replaceChildren();
+    if(status.active){
+      banner.append(el('strong',status.state==='trial'?'Kennel One free trial active':'Kennel One subscription active'));
+      if(status.validThrough)banner.append(el('p','Access through '+new Date(status.validThrough).toLocaleDateString()+'.'));
+      else if(status.plan==='lifetime')banner.append(el('p','Lifetime access active.'));
+      if(status.state==='trial')banner.append(el('p','When your free trial ends, you can choose a paid plan here. Existing paid subscribers do not need to purchase again.'));
+    }else{
+      banner.append(el('strong','Subscription needed'));
+      banner.append(el('p','If you have already purchased Kennel One on iPhone or Android, link that purchase to this account before paying again.'));
+      if(role==='owner'){
+        const plans=el('div',undefined,'billing-plans');
+        const notice=el('p','', 'muted');
+        for(const [plan,label] of [['monthly','$10.99 monthly'],['annual','$99.99 yearly'],['lifetime','$299.99 lifetime']]){
+          plans.append(button(label,async()=>{
+            plans.querySelectorAll('button').forEach(b=>b.disabled=true);
+            notice.textContent='Opening secure Square checkout…';
+            try {
+              const {checkout}=await api('billing/checkout',{method:'POST',
+                headers:{'Content-Type':'application/json'},body:JSON.stringify({kennel,plan})});
+              const u=new URL(checkout.url);
+              if(u.protocol!=='https:'||!(u.hostname==='square.link'||u.hostname.endsWith('.square.link')||
+                 u.hostname==='checkout.square.site'||u.hostname==='square.site'))throw Error('Unrecognized payment provider');
+              window.location.assign(u.href);
+            }catch(error){
+              notice.textContent=error.message;
+              plans.querySelectorAll('button').forEach(b=>b.disabled=false);
+            }
+          },'secondary'));
+        }
+        const check=button('Check payment and unlock access',async()=>{
+          check.disabled=true;
+          notice.textContent='Verifying your checkout directly with Square…';
+          try{
+            const result=await api('billing/checkout/confirm',{method:'POST',
+              headers:{'Content-Type':'application/json'},body:JSON.stringify({kennel})});
+            if(result.status?.active===true){
+              notice.textContent='Payment verified. Kennel One access is active.';
+              await refreshSubscriptionBanner();
+              await load();
+            }else{
+              notice.textContent='No active payment was found yet. Check again after completing checkout.';
+            }
+          }catch(error){
+            notice.textContent=error.status===409
+              ?'Square has not confirmed an eligible completed payment yet. If you paid, check again shortly.'
+              :error.message;
+          }finally{check.disabled=false}
+        },'secondary');
+        const waiting=el('p','A checkout link is not proof of payment. Only Square confirmation will unlock Kennel One.','muted');
+        banner.append(plans,check,notice,waiting);
+      }
+    }
+  }catch(e){
+    banner.hidden=false;
+    banner.replaceChildren(el('p','Subscription verification is not available yet. Your existing access is unchanged.'));
+  }
 }
 async function load(silent=false){
   if(!kennel||invitationMode)return;
@@ -741,8 +818,23 @@ $('print').insertAdjacentElement('afterend',exportButton);
 window.addEventListener('beforeunload',e=>{if(editor?.dirty){e.preventDefault();e.returnValue=''}});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&identity&&!loading&&!saving)load(true)});
 setInterval(()=>{if(!document.hidden&&identity&&!loading&&!saving&&!$('reauth').open)load(true)},15000);
-let invitationMode=false;
-function showJoin(){invitationMode=true;$('join').hidden=false;$('login').hidden=true;$('workspace').hidden=true}
+let invitationMode=false,signupMode=false;
+function showSignup(){signupMode=true;invitationMode=false;$('signup').hidden=false;$('join').hidden=true;$('login').hidden=true;$('workspace').hidden=true;message('');}
+$('showSignup').onclick=showSignup;
+$('signupBack').onclick=()=>{signupMode=false;$('signup').hidden=true;$('login').hidden=false;message('')};
+$('signupForm').onsubmit=async e=>{
+ e.preventDefault();$('signupSubmit').disabled=true;$('signupStatus').textContent='';
+ try {
+  const email=$('signupEmail').value.trim().toLowerCase();
+  await api('signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+   email,password:$('signupPassword').value,name:$('signupName').value.trim(),kennelName:$('signupKennel').value.trim()
+  })});
+  $('signupPassword').value='';signupMode=false;$('signup').hidden=true;$('login').hidden=false;
+  $('email').value=email;message('Account created. Sign in to use your free trial.');
+ }catch(error){$('signupStatus').textContent=error.message;}
+ finally{$('signupSubmit').disabled=false}
+};
+function showJoin(){signupMode=false;$('signup').hidden=true;invitationMode=true;$('join').hidden=false;$('login').hidden=true;$('workspace').hidden=true}
 $('showJoin').onclick=showJoin;
 $('joinBack').onclick=()=>{invitationMode=false;$('join').hidden=true;$('joinPassword').value='';init()};
 $('joinForm').onsubmit=async e=>{e.preventDefault();$('joinSubmit').disabled=true;try{await api('invitations/accept',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:$('joinToken').value.trim(),email:$('joinEmail').value.trim(),name:$('joinName').value.trim(),password:$('joinPassword').value})});await api('logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});employees.reset();identity=null;rows.clear();teamMembers=[];kennel='';role='';invitationMode=false;$('joinPassword').value='';$('joinToken').value='';$('join').hidden=true;$('login').hidden=false;message('Invitation accepted. Sign in with your Business account to start work.');$('email').value=$('joinEmail').value}catch(e){$('joinPassword').value='';$('joinStatus').textContent=e.message}finally{$('joinSubmit').disabled=false}};

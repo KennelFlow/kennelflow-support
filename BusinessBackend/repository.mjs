@@ -15,7 +15,36 @@ export function createRepository(connectionString) {
  }
  return {
   async allowLogin(key){return (await pool.query('SELECT business_login_allowed($1) AS allowed',[key])).rows[0].allowed},
-  async createOwner(email,hash,name,kennelName,user,kennel){await pool.query('SELECT business_create_kennel($1,$2,$3,$4,$5,$6)',[email,hash,name,kennelName,user,kennel])},
+  async createOwner(email,hash,name,kennelName,user,kennel){
+   await pool.query('SELECT business_signup_with_trial($1,$2,$3,$4,$5,$6)',[email,hash,name,kennelName,user,kennel]);
+  },
+  async billingStatus(actor,kennel){
+   return scoped(actor,kennel,async c=>(await c.query('SELECT business_billing_status($1) AS status',[kennel])).rows[0].status);
+  },
+  async linkVerifiedPurchase(actor,kennel,purchase){
+   return scoped(actor,kennel,async c=>{
+    const status=await c.query('SELECT business_link_verified_purchase($1,$2,$3,$4,$5,$6,$7) AS receipt',[
+     kennel, purchase.provider,purchase.providerPurchaseId,purchase.plan,purchase.state,
+     purchase.validThrough||null,purchase.verifiedAt||new Date().toISOString()]);
+    return status.rows[0].receipt;
+   });
+  },
+  async pendingWindowsCheckout(actor,kennel){
+   return scoped(actor,kennel,async c=>(await c.query(
+    'SELECT business_pending_windows_checkout($1) AS pending',[kennel])).rows[0].pending);
+  },
+  async saveWindowsCheckout(actor,kennel,plan,idempotencyKey,link){
+   return scoped(actor,kennel,async c=>(await c.query(
+    'SELECT business_save_windows_checkout($1,$2,$3,$4,$5,$6) AS pending',
+    [kennel,plan,idempotencyKey,link.linkId,link.orderId,link.url])).rows[0].pending);
+  },
+  async settleWindowsCheckout(actor,kennel,orderId,purchase){
+   return scoped(actor,kennel,async c=>(await c.query(
+    'SELECT business_settle_windows_checkout($1,$2,$3,$4,$5,$6,$7) AS status',[
+    kennel,orderId,purchase.providerPurchaseId,purchase.plan,purchase.state,
+    purchase.validThrough||null,new Date().toISOString()
+   ])).rows[0].status);
+  },
   async changePassword(actor,hash){return scoped(actor,null,c=>c.query('SELECT business_password($1,$2)',[actor.id,hash]))},
   async updateProfile(actor,kennel,profile){return scoped(actor,kennel,c=>c.query(
    'SELECT business_update_profile($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',

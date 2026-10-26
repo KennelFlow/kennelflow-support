@@ -1,5 +1,8 @@
 import { randomBytes, randomUUID, createHash, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
+import {verifyApplePurchase,verifyGooglePurchase} from './billing.mjs';
+import {createWindowsPaymentLink} from './billing-square.mjs';
+import {verifyPendingWindowsCheckout} from './billing-square-verify.mjs';
 import { canManage, canRead, canWrite, validEmail, validPassword, validUUID, validateRecord, collections } from './policy.mjs';
 const derive=promisify(scrypt);
 export function normalizeBusinessWebsite(value) {
@@ -28,7 +31,8 @@ async function bytes(request, maximum=1048576) {
  return Buffer.concat(chunks);
 }
 async function body(request) { return JSON.parse((await bytes(request)).toString('utf8')||'{}'); }
-export function createAPI(repo) { return { async fetch(request) {
+export function createAPI(repo, {billingEnforced=process.env.KENNELONE_BILLING_ENFORCEMENT==='true'}={}) {
+ return { async fetch(request) {
  try {
  const url=new URL(request.url),path=url.pathname.replace(/^\/kennelflowapi(?=\/|$)/,'');
  if(request.method==='GET'&&path==='/v2/capabilities')return response(200,{version:2,employeeAccounts:true,revisionSync:true,collections});
@@ -105,11 +109,74 @@ export function createAPI(repo) { return { async fetch(request) {
  }
  if(request.method==='POST'&&path==='/v2/logout'){await repo.logout(actor);return response(200,{ok:true})}
  if(request.method==='GET'&&path==='/v2/me')return response(200,{user:{id:actor.id,email:actor.email,name:actor.name},kennels:await repo.kennels(actor)});
+ if(request.method==='GET'&&path==='/v2/billing/status'){
+  const kennel=String(url.searchParams.get('kennel')||'').toLowerCase();
+  if(!validUUID(kennel))return response(400,{error:'Valid kennel required'});
+  if(!(await repo.kennels(actor)).some(k=>k.id===kennel))return response(403,{error:'Access denied'});
+  return response(200,{status:await repo.billingStatus(actor,kennel)});
+ }
+ if(request.method==='POST'&&path==='/v2/billing/link'){
+  const input=await body(request),kennel=String(input.kennel||'').toLowerCase();
+  if(!validUUID(kennel))return response(400,{error:'Valid kennel required'});
+  const member=(await repo.kennels(actor)).find(k=>k.id===kennel);
+  if(!member||member.role!=='owner')return response(403,{error:'Only the kennel owner can link purchases'});
+  const provider=input.provider;
+  if(!['apple','google'].includes(provider) || typeof input.proof!=='string'||input.proof.length>30000)
+   return response(400,{error:'Store and purchase proof required'});
+  const purchase=provider==='apple'
+   ?await verifyApplePurchase(input.proof)
+   :await verifyGooglePurchase(input.proof);
+  const linked=await repo.linkVerifiedPurchase(actor,kennel,purchase);
+  return response(200,{ok:true,status:linked});
+ }
+ if(request.method==='POST'&&path==='/v2/billing/checkout'){
+  const input=await body(request),kennel=String(input.kennel||'').toLowerCase();
+  const plan=String(input.plan||'').toLowerCase();
+  if(!validUUID(kennel)||!['monthly','annual','lifetime'].includes(plan))
+   return response(400,{error:'Valid kennel and subscription plan required'});
+  const member=(await repo.kennels(actor)).find(k=>k.id===kennel);
+  if(!member||member.role!=='owner')return response(403,{error:'Only the kennel owner can start checkout'});
+  const entitlement=await repo.billingStatus(actor,kennel);
+  if(entitlement.active&&entitlement.state!=='trial')
+   return response(409,{error:'A subscription already covers this kennel. Do not pay again.'});
+  const pending=await repo.pendingWindowsCheckout(actor,kennel);
+  if(pending) {
+   if(pending.plan!==plan)return response(409,{error:'A checkout for another plan already exists. Finish or cancel it before changing plans.'});
+   return response(200,{checkout:pending,reused:true});
+  }
+  const idempotencyKey=randomUUID();
+  const link=await createWindowsPaymentLink({plan,kennelId:kennel,email:actor.email,idempotencyKey});
+  const saved=await repo.saveWindowsCheckout(actor,kennel,plan,idempotencyKey,link);
+  return response(201,{checkout:saved,reused:false});
+ }
+ if(request.method==='POST'&&path==='/v2/billing/checkout/confirm'){
+  const input=await body(request),kennel=String(input.kennel||'').toLowerCase();
+  if(!validUUID(kennel))return response(400,{error:'Valid kennel required'});
+  const member=(await repo.kennels(actor)).find(k=>k.id===kennel);
+  if(!member||member.role!=='owner')return response(403,{error:'Only the kennel owner can verify checkout'});
+  const pending=await repo.pendingWindowsCheckout(actor,kennel);
+  if(!pending)return response(200,{status:await repo.billingStatus(actor,kennel),pending:false});
+  // Square's own payment, order, and subscription APIs are the sole authority.
+  // No user-supplied payment ID or browser redirect can unlock a subscription.
+  const verified=await verifyPendingWindowsCheckout(pending);
+  const status=await repo.settleWindowsCheckout(actor,kennel,pending.orderId,verified);
+  return response(200,{status,pending:false});
+ }
+ // A checkout link alone grants nothing. Only verified Square settlement can
+ // write Windows entitlements. Do not add a browser-called 'mark as paid' route.
+
  const match=/^\/v2\/kennels\/([a-f0-9-]{36})\/(members|invitations|records|files|history|clock|private-messages)(?:\/([a-f0-9-]{36}))?$/.exec(path);
  if(!match||!validUUID(match[1]))return response(404,{error:'Not found'});
  const kennel=match[1],resource=match[2],id=match[3];
  const membership=(await repo.kennels(actor)).find(k=>k.id===kennel);
  if(!membership)return response(403,{error:'Access denied'});
+ if(billingEnforced) {
+  // All kennel resources, including employee invitations and record sync,
+  // share the kennel owner's verified entitlement. Non-paid sessions can
+  // still authenticate, view billing status and link a legitimate receipt.
+  const billing=await repo.billingStatus(actor,kennel);
+  if(billing?.active!==true)return response(402,{error:'An active Kennel One subscription or trial is required',billingStatus:billing||{active:false}});
+ }
  const role=membership.role;
  if(resource==='private-messages'&&!id&&['GET','POST'].includes(request.method)){
   if(!['owner','admin','staff'].includes(role))return response(403,{error:'Access denied'});
