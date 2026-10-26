@@ -31,7 +31,7 @@ async function bytes(request, maximum=1048576) {
  return Buffer.concat(chunks);
 }
 async function body(request) { return JSON.parse((await bytes(request)).toString('utf8')||'{}'); }
-export function createAPI(repo, {billingEnforced=process.env.KENNELONE_BILLING_ENFORCEMENT==='true'}={}) {
+export function createAPI(repo, {billingEnforced=process.env.KENNELONE_BILLING_ENFORCEMENT==='true', verifyApple=verifyApplePurchase, verifyGoogle=verifyGooglePurchase}={}) {
  return { async fetch(request) {
  try {
  const url=new URL(request.url),path=url.pathname.replace(/^\/kennelflowapi(?=\/|$)/,'');
@@ -124,8 +124,8 @@ export function createAPI(repo, {billingEnforced=process.env.KENNELONE_BILLING_E
   if(!['apple','google'].includes(provider) || typeof input.proof!=='string'||input.proof.length>30000)
    return response(400,{error:'Store and purchase proof required'});
   const purchase=provider==='apple'
-   ?await verifyApplePurchase(input.proof)
-   :await verifyGooglePurchase(input.proof);
+   ?await verifyApple(input.proof)
+   :await verifyGoogle(input.proof);
   const linked=await repo.linkVerifiedPurchase(actor,kennel,purchase);
   return response(200,{ok:true,status:linked});
  }
@@ -264,6 +264,8 @@ export function createAPI(repo, {billingEnforced=process.env.KENNELONE_BILLING_E
  return response(404,{error:'Not found'});
  }catch(e){
   if(e.code==='23514')return response(400,{error:'Check clock times and close the existing open entry before adding another'});
+  if(e.status===403)return response(403,{error:'Store purchase inactive or could not be verified'});
+  if(e.status===400)return response(400,{error:'Invalid purchase proof or request'});
   if(e.status===413)return response(413,{error:'Request too large'});
   if(e instanceof SyntaxError)return response(400,{error:'Invalid JSON'});
   if(e.code==='40001'||e.code==='23505')return response(409,{error:'Conflict; refresh before retrying'});

@@ -1,7 +1,7 @@
 # Kennel One Windows Billing Release Gate — 2026-10-26
 Status: LIVE SQUARE CATALOG CONFIGURED; Windows integration still DEVELOPMENT ONLY — not deployed or submitted to Microsoft.
 
-Verified: 130 automated tests pass, including 2 new fail-closed Square checkout regression tests.
+Verified: 135 automated tests pass, including Apple/Google owner-only purchase-linking, revoked/expired proof rejection, and fail-closed Square checks.
 Existing Square payment server /health reports production environment, webhook and cloud configured.
 Recurring Square payment links require a subscription PLAN VARIATION ID, not a plan ID.
 Registration, shared trials, cross-platform verification, Windows checkout and settlement are staged.
@@ -12,7 +12,7 @@ RELEASE BLOCKERS:
 2. Square production monthly and annual plan variations created and verified on October 26, 2026; variation IDs saved locally in Documents/KennelOne-Windows-Release/square-subscription-catalog-20261026.json. Backend staging runtime still does not have the production token and configured plan IDs.
 3. COMPLETED: live Square catalog verified monthly $10.99 and annual $99.99 static USD prices; tested generation and deletion of one recurring Square checkout link per plan. No charge was made.
 4. BLOCKED: no real completed payment-to-entitlement test has run. Live checkout link creation does not prove paid-user access.
-5. iOS and Android apps still require cross-platform purchase linking validation.
+5. iOS and Android apps still require native cross-platform purchase linking. The Android source (KennelOne-Android-Build17, version 3.0.0) has no Google Play Billing dependency or purchase-token bridge; a native edit was blocked and is not represented as complete. iOS StoreKit currently verifies purchases locally and also needs a signed-proof account bridge.
 6. Database migrations are not deployed and the Microsoft Store update is not submitted.
 
 READ-ONLY ACCOUNT AUDIT (after secure live Square authorization):
