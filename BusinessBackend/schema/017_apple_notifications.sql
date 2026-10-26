@@ -21,8 +21,10 @@ BEGIN
  IF NOT FOUND THEN
   RETURN jsonb_build_object('matched',false,'changed',false);
  END IF;
+ -- Refunds and revocations are terminal for this verified purchase identity.
+ -- A fresh purchase must be re-linked through an authenticated owner receipt.
  IF current_purchase.state IN ('refunded','revoked')
-   AND p_state IN ('active','grace') THEN
+   AND p_state<>current_purchase.state THEN
   RETURN jsonb_build_object('matched',true,'changed',false,'requiresReview',true);
  END IF;
  IF p_verified_at<current_purchase.verified_at THEN
