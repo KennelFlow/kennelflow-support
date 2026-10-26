@@ -12,13 +12,14 @@ const input=(path,method='GET',data,cookie)=>new Request(origin+path,{
   ...(method==='POST'?{Origin:origin,'Sec-Fetch-Site':'same-origin','Content-Type':'application/json'}:{})},
  body:data?JSON.stringify(data):method==='POST'?'{}':undefined
 });
-function backend(calls){
+function backend(calls,role='owner'){
  return async(url,options={})=>{
   const path=new URL(url).pathname;
   calls.push(path);
   if(path==='/v2/login')return Response.json({token:'ab'.repeat(32)});
-  if(path==='/v2/me')return Response.json({user:{id:scope,email:'preview@example.invalid'},kennels:[{id:scope,role:'owner'}]});
+  if(path==='/v2/me')return Response.json({user:{id:scope,email:'preview@example.invalid'},kennels:[{id:scope,role}]});
   if(path==='/v2/billing/status')return Response.json({status:{active:true,provider:'google',plan:'annual'}});
+  if(path==='/v2/billing/refresh')return Response.json({status:{active:true,provider:'windows',plan:'monthly'}});
   return Response.json({error:'not found'},{status:404});
  };
 }
@@ -39,4 +40,29 @@ test('foreign kennel cannot be used to query another customer subscription',asyn
  const status=await handleDirect(input('/api/billing/status?kennel='+foreign,'GET',null,cookie),env,backend(calls));
  assert.equal(status.status,403);
  assert(!calls.includes('/v2/billing/status'));
+});
+
+
+test('Windows billing gateway forwards owner renewal checks only after verifying kennel ownership',async()=>{
+ const calls=[];
+ const fetcher=backend(calls);
+ const auth=await handleDirect(input('/api/login','POST',{email:'preview@example.invalid',
+  password:'example-not-a-real-secret'}),env,fetcher);
+ const cookie=auth.headers.get('set-cookie').match(/__Host-ko_session=[\w-]+/)[0];
+ const r=await handleDirect(input('/api/billing/refresh','POST',{kennel:scope},cookie),env,fetcher);
+ assert.equal(r.status,200);
+ assert.equal((await r.json()).status.provider,'windows');
+ assert(calls.includes('/v2/billing/refresh'));
+});
+test('Windows billing gateway refuses employee or foreign kennel renewal requests',async()=>{
+ const staffCalls=[];
+ const staffFetcher=backend(staffCalls,'staff');
+ const auth=await handleDirect(input('/api/login','POST',{email:'preview@example.invalid',
+  password:'example-not-a-real-secret'}),env,staffFetcher);
+ const cookie=auth.headers.get('set-cookie').match(/__Host-ko_session=[\w-]+/)[0];
+ const staff=await handleDirect(input('/api/billing/refresh','POST',{kennel:scope},cookie),env,staffFetcher);
+ assert.equal(staff.status,403);
+ const foreignCheck=await handleDirect(input('/api/billing/refresh','POST',{kennel:foreign},cookie),env,staffFetcher);
+ assert.equal(foreignCheck.status,403);
+ assert(!staffCalls.includes('/v2/billing/refresh'));
 });

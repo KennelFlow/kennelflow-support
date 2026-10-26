@@ -50,3 +50,15 @@ test('employee sees status, not owner payment buttons',async()=>{
   assert(staff.includes('Kennel One free trial active'));
   assert(!staff.includes('$10.99 monthly'));
 });
+test('existing Square subscriber can refresh paid-through access without another purchase',async()=>{
+  const displayed=flatten(await display({active:true,state:'active',plan:'monthly',provider:'windows'})).map(n=>n.text);
+  assert(displayed.includes('Refresh existing Square subscription'));
+  assert(!displayed.includes('$10.99 monthly'));
+  assert(!displayed.includes('Check payment and unlock access'));
+});
+test('non-owner cannot refresh billing and Apple subscriber sees no Square refresh',async()=>{
+  const staff=flatten(await display({active:true,state:'active',plan:'monthly',provider:'windows'},'staff')).map(n=>n.text);
+  assert(!staff.includes('Refresh existing Square subscription'));
+  const apple=flatten(await display({active:true,state:'active',plan:'annual',provider:'apple'})).map(n=>n.text);
+  assert(!apple.includes('Refresh existing Square subscription'));
+});

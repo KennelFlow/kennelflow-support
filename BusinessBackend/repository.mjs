@@ -45,6 +45,16 @@ export function createRepository(connectionString) {
     purchase.validThrough||null,new Date().toISOString()
    ])).rows[0].status);
   },
+  async windowsSubscriptionForRefresh(actor,kennel) {
+   return scoped(actor,kennel,async c=>(await c.query(
+    'SELECT business_windows_subscription_for_refresh($1) AS checkout',[kennel])).rows[0].checkout);
+  },
+  async refreshWindowsSubscription(actor,kennel,purchase) {
+   return scoped(actor,kennel,async c=>(await c.query(
+    'SELECT business_refresh_windows_subscription($1,$2,$3,$4) AS status',
+    [kennel,purchase.providerPurchaseId,purchase.validThrough,new Date().toISOString()]
+   )).rows[0].status);
+  },
   async changePassword(actor,hash){return scoped(actor,null,c=>c.query('SELECT business_password($1,$2)',[actor.id,hash]))},
   async updateProfile(actor,kennel,profile){return scoped(actor,kennel,c=>c.query(
    'SELECT business_update_profile($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',

@@ -29,7 +29,8 @@ export async function verifyCompletedCheckout({checkout,paymentId},env=process.e
  if(payment?.id!==paymentId||payment?.status!=='COMPLETED'||
    payment?.order_id!==checkout.orderId||payment?.location_id!==env.SQUARE_LOCATION_ID||
    payment?.amount_money?.currency!=='USD'||
-   Number(payment?.amount_money?.amount)!==WINDOWS_PLANS[checkout.plan].amountCents)
+   Number(payment?.amount_money?.amount)!==WINDOWS_PLANS[checkout.plan].amountCents||
+   Number(payment?.refunded_money?.amount||0)>0)
   throw err('Square payment does not match the checkout');
  const orderResponse=await fetchSquare('/v2/orders/'+encodeURIComponent(checkout.orderId),env,fetcher);
  const order=orderResponse.order;
@@ -94,4 +95,25 @@ export function verifiedLifetimeEntitlement(initialPayment) {
  if(initialPayment?.plan!=='lifetime'||!initialPayment.paymentId)throw err('No verified lifetime payment');
  return {provider:'windows',providerPurchaseId:'sqpay:'+initialPayment.paymentId,
    plan:'lifetime',state:'active',validThrough:null};
+}
+
+
+// Refresh access only for a subscription already matched to a verified
+// original checkout. An ACTIVE status alone is insufficient: Square must
+// confirm a paid-through date in the future.
+export async function verifyWindowsSubscriptionRenewal(checkout,env=process.env,fetcher=fetch) {
+ if(!checkout||!['monthly','annual'].includes(checkout.plan)||
+   typeof checkout.providerPurchaseId!=='string'||
+   !/^sqsub:[A-Za-z0-9:_-]{3,256}$/.test(checkout.providerPurchaseId)||
+   !/^[A-Za-z0-9:_-]{3,256}$/.test(checkout.orderId||''))
+   throw err('No verified existing subscription',400);
+ const orderResponse=await fetchSquare('/v2/orders/'+encodeURIComponent(checkout.orderId),env,fetcher);
+ const tender=(orderResponse.order?.tenders||[]).find(t=>typeof t.payment_id==='string'&&t.payment_id.length>2);
+ if(!tender)throw err('Original Square payment is missing',409);
+ const originalPayment=await verifyCompletedCheckout({checkout,paymentId:tender.payment_id},env,fetcher);
+ if(!originalPayment.customerId)throw err('Original Square customer is missing',409);
+ return await verifyActiveSquareSubscription({
+   subscriptionId:checkout.providerPurchaseId.slice('sqsub:'.length),checkout,
+   initialPayment:originalPayment
+ },env,fetcher);
 }

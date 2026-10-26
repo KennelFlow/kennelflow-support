@@ -217,6 +217,14 @@ async function direct(request,env={},fetcher=fetch) {
     return forward(await upstream('/v2/billing/checkout/confirm',token,'POST',{kennel:scope},false,fetcher));
   }
 
+  if(path==='/api/billing/refresh'&&method==='POST'){
+    const input=await parseJSON(request,16384),scope=String(input.kennel||'').toLowerCase();
+    if(!uuid(scope))throw fail(400,'Invalid kennel ID');
+    const member=await membership(token,scope,fetcher);
+    if(member.role!=='owner')throw fail(403,'Only the kennel owner can refresh Square billing');
+    return forward(await upstream('/v2/billing/refresh',token,'POST',{kennel:scope},false,fetcher));
+  }
+
   if(path==='/api/kennels'&&method==='GET'){
     const r=await upstream('/v2/me',token,'GET',undefined,false,fetcher),v=await r.json();
     return jsonResponse(r.status,r.status===200?{kennels:v.kennels}:v);

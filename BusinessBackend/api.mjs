@@ -2,7 +2,7 @@ import { randomBytes, randomUUID, createHash, scrypt, timingSafeEqual } from 'no
 import { promisify } from 'node:util';
 import {verifyApplePurchase,verifyGooglePurchase} from './billing.mjs';
 import {createWindowsPaymentLink} from './billing-square.mjs';
-import {verifyPendingWindowsCheckout} from './billing-square-verify.mjs';
+import {verifyPendingWindowsCheckout,verifyWindowsSubscriptionRenewal} from './billing-square-verify.mjs';
 import { canManage, canRead, canWrite, validEmail, validPassword, validUUID, validateRecord, collections } from './policy.mjs';
 const derive=promisify(scrypt);
 export function normalizeBusinessWebsite(value) {
@@ -31,7 +31,7 @@ async function bytes(request, maximum=1048576) {
  return Buffer.concat(chunks);
 }
 async function body(request) { return JSON.parse((await bytes(request)).toString('utf8')||'{}'); }
-export function createAPI(repo, {billingEnforced=process.env.KENNELONE_BILLING_ENFORCEMENT==='true', verifyApple=verifyApplePurchase, verifyGoogle=verifyGooglePurchase}={}) {
+export function createAPI(repo, {billingEnforced=process.env.KENNELONE_BILLING_ENFORCEMENT==='true', verifyApple=verifyApplePurchase, verifyGoogle=verifyGooglePurchase, verifyWindowsRenewal=verifyWindowsSubscriptionRenewal}={}) {
  return { async fetch(request) {
  try {
  const url=new URL(request.url),path=url.pathname.replace(/^\/kennelflowapi(?=\/|$)/,'');
@@ -162,6 +162,19 @@ export function createAPI(repo, {billingEnforced=process.env.KENNELONE_BILLING_E
   const status=await repo.settleWindowsCheckout(actor,kennel,pending.orderId,verified);
   return response(200,{status,pending:false});
  }
+ if(request.method==='POST'&&path==='/v2/billing/refresh') {
+  const input=await body(request),kennel=String(input.kennel||'').toLowerCase();
+  if(!validUUID(kennel))return response(400,{error:'Valid kennel required'});
+  const member=(await repo.kennels(actor)).find(k=>k.id===kennel);
+  if(!member||member.role!=='owner')return response(403,{error:'Only the kennel owner can refresh the subscription'});
+  const checkout=await repo.windowsSubscriptionForRefresh(actor,kennel);
+  if(!checkout)return response(409,{error:'No previously verified Square subscription to refresh'});
+  const verified=await verifyWindowsRenewal(checkout);
+  if(verified.providerPurchaseId!==checkout.providerPurchaseId)
+    return response(403,{error:'Square subscription identity does not match'});
+  const status=await repo.refreshWindowsSubscription(actor,kennel,verified);
+  return response(200,{status});
+ }
  // A checkout link alone grants nothing. Only verified Square settlement can
  // write Windows entitlements. Do not add a browser-called 'mark as paid' route.
 
@@ -265,6 +278,7 @@ export function createAPI(repo, {billingEnforced=process.env.KENNELONE_BILLING_E
  }catch(e){
   if(e.code==='23514')return response(400,{error:'Check clock times and close the existing open entry before adding another'});
   if(e.status===403)return response(403,{error:'Store purchase inactive or could not be verified'});
+  if(e.status===409)return response(409,{error:'Square has not confirmed a qualifying paid subscription yet'});
   if(e.status===400)return response(400,{error:'Invalid purchase proof or request'});
   if(e.status===413)return response(413,{error:'Request too large'});
   if(e instanceof SyntaxError)return response(400,{error:'Invalid JSON'});

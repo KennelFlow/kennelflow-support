@@ -117,6 +117,25 @@ async function refreshSubscriptionBanner(){
       banner.append(el('strong','Subscription needed'));
       banner.append(el('p','If you have already purchased Kennel One on iPhone or Android, link that purchase to this account before paying again.'));
     }
+    if(role==='owner'&&(status.provider==='windows'||!status.active)){
+      const refresh=button('Refresh existing Square subscription',async()=>{
+        refresh.disabled=true;
+        refresh.textContent='Checking Square…';
+        try {
+          const result=await api('billing/refresh',{method:'POST',
+            headers:{'Content-Type':'application/json'},body:JSON.stringify({kennel})});
+          if(result.status?.active){
+            await refreshSubscriptionBanner();
+            await load();
+          }else message('A current paid Square subscription was not confirmed.');
+        }catch(error){
+          message(error.status===409
+            ?'Square cannot confirm a current paid renewal yet. No access changes were made.'
+            :error.message);
+        }finally{refresh.disabled=false;refresh.textContent='Refresh existing Square subscription'}
+      },'secondary');
+      banner.append(el('p','Already subscribed through Square? Check payment status before buying another plan.','muted'),refresh);
+    }
     if(role==='owner'&&(!status.active||status.state==='trial')){
         const plans=el('div',undefined,'billing-plans');
         const notice=el('p','', 'muted');

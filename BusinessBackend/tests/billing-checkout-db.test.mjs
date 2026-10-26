@@ -21,7 +21,7 @@ before(async()=>{
  for(const n of ['001_kennelflow.sql','002_revision_sync.sql','003_security_hardening.sql',
   '004_auth.sql','005_access_control.sql','006_password_reset.sql','007_business.sql',
   '008_files.sql','009_employees.sql','010_business_profile.sql','011_private_messages.sql',
-  '012_unified_billing.sql','013_windows_checkout.sql','014_windows_settlement.sql'])
+  '012_unified_billing.sql','013_windows_checkout.sql','014_windows_settlement.sql','015_windows_renewal.sql'])
   await db.exec(await readFile(new URL('../schema/'+n,import.meta.url),'utf8'));
  await db.query('INSERT INTO kennels(id,name) VALUES($1,$2)',[kennel,'Staging Kennel']);
  for(const [user,role] of [[owner,'owner'],[staff,'staff']]){
@@ -55,7 +55,7 @@ test('customers and employees cannot forge successful payment status through che
 });
 test('only verified Square settlement route can activate a matching pending Windows checkout',async()=>{
  const statement='SELECT business_settle_windows_checkout($1,$2,$3,$4,$5,$6,$7) AS status';
- const proof=[kennel,'test-order','sqpay:verified-payment-01','annual','active',new Date(Date.now()+365*86400000).toISOString(),new Date().toISOString()];
+ const proof=[kennel,'test-order','sqsub:verified-subscription-01','annual','active',new Date(Date.now()+365*86400000).toISOString(),new Date().toISOString()];
  await assert.rejects(as(staff,statement,proof),{code:'42501'});
  await assert.rejects(as(owner,statement,[...proof.slice(0,1),'incorrect-order',...proof.slice(2)]),{code:'42501'});
  const result=await as(owner,statement,proof);

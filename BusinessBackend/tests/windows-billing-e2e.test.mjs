@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {verifyPendingWindowsCheckout} from '../billing-square-verify.mjs';
+import {verifyPendingWindowsCheckout,verifyWindowsSubscriptionRenewal} from '../billing-square-verify.mjs';
 
 // Local end-to-end trust-boundary test. No production or sandbox requests.
 // Faked Square HTTP responses are never treated as evidence of a real purchase.
@@ -31,7 +31,7 @@ function mockedSquare({pay=payment,ord=order,subs=[subscription]}={}){
   if(url.endsWith('/v2/orders/'+orderId))return Response.json({order:ord});
   if(url.endsWith('/v2/payments/'+paymentId))return Response.json({payment:pay});
   if(url.endsWith('/v2/subscriptions/search'))return Response.json({subscriptions:subs});
-  if(url.endsWith('/v2/subscriptions/'+subscriptionId))return Response.json({subscription:subs[0]});
+  if(url.includes('/v2/subscriptions/'))return Response.json({subscription:subs[0]});
   throw Error('Unexpected request to '+url);
  };
 }
@@ -40,7 +40,7 @@ async function migrations(db){
  for(const filename of ['001_kennelflow.sql','002_revision_sync.sql','003_security_hardening.sql',
   '004_auth.sql','005_access_control.sql','006_password_reset.sql','007_business.sql',
   '008_files.sql','009_employees.sql','010_business_profile.sql','011_private_messages.sql',
-  '012_unified_billing.sql','013_windows_checkout.sql','014_windows_settlement.sql'])
+  '012_unified_billing.sql','013_windows_checkout.sql','014_windows_settlement.sql','015_windows_renewal.sql'])
   await db.exec(await readFile(new URL('../schema/'+filename,import.meta.url),'utf8'));
 }
 async function as(db,actor,sql,params=[]){
@@ -85,6 +85,27 @@ test('complete verified monthly checkout unlocks only its kennel and resists dup
   assert.equal(count.rows[0].n,1);
   const state=await db.query('SELECT state FROM kennelone_windows_checkout_links WHERE square_order_id=$1',[orderId]);
   assert.equal(state.rows[0].state,'paid');
+  const stored=await as(db,owner,
+   'SELECT business_windows_subscription_for_refresh($1) AS checkout',[kennel]);
+  assert.equal(stored.rows[0].checkout.providerPurchaseId,'sqsub:'+subscriptionId);
+  await assert.rejects(as(db,employee,
+   'SELECT business_windows_subscription_for_refresh($1)',[kennel]),{code:'42501'});
+  const renewedPaidThrough=new Date(Date.now()+67*86400000).toISOString().slice(0,10);
+  const remote=await verifyWindowsSubscriptionRenewal(stored.rows[0].checkout,environment,
+   mockedSquare({subs:[{...subscription,paid_until_date:renewedPaidThrough}]}));
+  assert.equal(remote.providerPurchaseId,proof.providerPurchaseId);
+  const refresh='SELECT business_refresh_windows_subscription($1,$2,$3,$4) AS status';
+  const refreshArgs=[kennel,remote.providerPurchaseId,remote.validThrough,new Date().toISOString()];
+  await assert.rejects(as(db,employee,refresh,refreshArgs),{code:'42501'});
+  const refreshed=await as(db,owner,refresh,refreshArgs);
+  assert.equal(refreshed.rows[0].status.active,true);
+  assert.equal(Date.parse(refreshed.rows[0].status.validThrough),Date.parse(remote.validThrough));
+  await assert.rejects(as(db,owner,refresh,[kennel,'sqsub:another',remote.validThrough,new Date().toISOString()]),{code:'42501'});
+  await assert.rejects(as(db,owner,refresh,[kennel,proof.providerPurchaseId,proof.validThrough,new Date().toISOString()]),{code:'42501'});
+  await assert.rejects(as(db,owner,statement,[kennel,orderId,'sqsub:another','monthly','active',
+   proof.validThrough,new Date().toISOString()]),{code:'42501'});
+  const stillOne=await db.query('SELECT count(*)::int AS n FROM kennelone_purchase_entitlements');
+  assert.equal(stillOne.rows[0].n,1);
  }finally{await db.close()}
 });
 test('wrong payer, wrong order, uncertain subscription or missing tender cannot activate a checkout',async()=>{
@@ -94,9 +115,26 @@ test('wrong payer, wrong order, uncertain subscription or missing tender cannot 
   {subs:[]},
   {subs:[{...subscription,status:'CANCELED'}]},
   {subs:[subscription,{...subscription,id:'TEST-SUBSCRIPTION-OTHER'}]},
-  {pay:{...payment,amount_money:{amount:9999,currency:'USD'}}}
+  {pay:{...payment,amount_money:{amount:9999,currency:'USD'}}},
+  {pay:{...payment,refunded_money:{amount:1099,currency:'USD'}}}
  ];
  for(const variant of variants)
   await assert.rejects(verifyPendingWindowsCheckout(checkout,environment,mockedSquare(variant)),
    error=>error.status===403||error.status===409);
+});
+
+
+test('subscription renewal is refused if Square cannot prove current payment status',async()=>{
+ const prior={orderId,plan:'monthly',providerPurchaseId:'sqsub:'+subscriptionId};
+ await assert.rejects(
+  verifyWindowsSubscriptionRenewal({...prior,providerPurchaseId:'sqsub:other'},environment,mockedSquare()),
+  {status:403});
+ await assert.rejects(
+  verifyWindowsSubscriptionRenewal(prior,environment,
+   mockedSquare({subs:[{...subscription,paid_until_date:'2020-01-01'}]})),
+  {status:403});
+ await assert.rejects(
+  verifyWindowsSubscriptionRenewal(prior,environment,
+   mockedSquare({pay:{...payment,refunded_money:{amount:1099,currency:'USD'}}})),
+  {status:403});
 });
