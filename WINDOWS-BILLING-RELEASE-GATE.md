@@ -1,5 +1,5 @@
 # Kennel One Windows Billing Release Gate — 2026-10-26
-Status: DEVELOPMENT ONLY — not deployed or submitted to Microsoft.
+Status: LIVE SQUARE CATALOG CONFIGURED; Windows integration still DEVELOPMENT ONLY — not deployed or submitted to Microsoft.
 
 Verified: 124 Business API and portal automated tests pass, plus 4 plan-audit tests.
 Existing Square payment server /health reports production environment, webhook and cloud configured.
@@ -9,9 +9,9 @@ Paywall enforcement remains OFF to protect existing users.
 
 RELEASE BLOCKERS:
 1. Square Developer Dashboard on the Mac remains signed out.
-2. Staging runtime does not have the Square production token/location or monthly/yearly variation IDs.
-3. Live monthly $10.99 and annual $99.99 variation ID, cadence and prices are unverified.
-4. No completed live payment-to-entitlement test has run.
+2. Square production monthly and annual plan variations created and verified on October 26, 2026; variation IDs saved locally in Documents/KennelOne-Windows-Release/square-subscription-catalog-20261026.json. Backend staging runtime still does not have the production token and configured plan IDs.
+3. COMPLETED: live Square catalog verified monthly $10.99 and annual $99.99 static USD prices; tested generation and deletion of one recurring Square checkout link per plan. No charge was made.
+4. BLOCKED: no real completed payment-to-entitlement test has run. Live checkout link creation does not prove paid-user access.
 5. iOS and Android apps still require cross-platform purchase linking validation.
 6. Database migrations are not deployed and the Microsoft Store update is not submitted.
 
@@ -25,3 +25,4 @@ node --test BusinessBackend/tests/*.test.mjs cloudflare/portal/tests/*.test.mjs
 
 Only release after live verified checkout unlocks a subscribed account without duplicate billing.
 Never commit secrets or enable the paywall before subscriber migration and validation.
+Production checkout smoke test on October 26: Square created both links successfully, then confirmed their deletion and cancellation of the associated orders. No customer purchases were submitted. Do not interpret this as a completed payment verification.
