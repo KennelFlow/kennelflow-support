@@ -35,3 +35,12 @@ Production checkout smoke test on October 26: Square created both links successf
 - 130 automated tests now pass, including explicit protections for a missing payment customer and missing recurring subscription.
 - REMAINING RELEASE BLOCKER: A fully linked payment, recurring subscription and account unlock has not been demonstrated in production. The mobile clients' shared purchase sync also must be validated before turning on the server paywall.
 - No customer charges, no production migration, no Microsoft update submission.
+
+2026-10-26 FOLLOW-UP VERIFICATION (read-only or sandbox; no live customer charges):
+- Microsoft Partner Center: existing Windows package remains **In certification**; this billing branch has not been deployed or resubmitted.
+- Windows 11 machine reports SVK9.KennelOne version 1.0.1 installed, status Ok. The signed package archive has a readable .msixbundle.
+- Actual Square sandbox hosted $10.99 checkout reports COMPLETED payment and OPEN order with a tender but has NO payment customer ID and NO matching recurring subscription. The live Square API response, evaluated through `verifyPendingWindowsCheckout`, correctly denied entitlement (409).
+- A separate API-created sandbox recurring subscription reported ACTIVE but had NO paid_until_date. `verifyActiveSquareSubscription` correctly denied entitlement. Sandbox recurring billing behavior is not production proof.
+- New `BusinessBackend/tests/windows-billing-e2e.test.mjs` exercises the payment/order/active-subscription/owner+staff entitlement path with mocked Square HTTP responses and a real in-memory PostgreSQL engine, verifies idempotent settlement, and rejects missing/mismatched or ambiguous evidence. This test is NOT a live completed Square purchase.
+- Microsoft Store submission can proceed through its independent certification process; do not switch on paid access restrictions or claim automatic subscription activation is production-verified.
+- Remaining release blocker: a **separately authorized real production purchase** must be checked end-to-end from secure Square payment through subscription paid_until_date, stored kennel ownership, account unlock and renewal/cancellation handling. Do not initiate a real charge without purchaser approval. Production DB migrations and cross-platform proof linking remain gated.
