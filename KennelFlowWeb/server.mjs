@@ -4,6 +4,7 @@ import {randomBytes, createHash, createHmac} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {canWrite, collections, uuid, validateModel} from './records.mjs';
 const BACKEND='https://br-long-night-b5uhw0hi-kennelflowapi.compute.c-7.us-east-2.aws.neon.tech';
+const OWNER_ACTIVITY='https://br-long-night-b5uhw0hi-kennelactivity.compute.c-7.us-east-2.aws.neon.tech';
 const SESSION_MS=28800000;
 const fail=(status,message)=>Object.assign(Error(message),{status});
 export function createWebServer({backend=BACKEND,fetcher=fetch,secure=process.env.RENDER==='true'||process.env.NODE_ENV==='production'}={}) {
@@ -35,7 +36,7 @@ export function createWebServer({backend=BACKEND,fetcher=fetch,secure=process.en
     if(!k||!['owner','admin','staff','viewer'].includes(k.role))throw fail(403,'No access to this kennel');
     return k;
   }
-  const files={'/catalog.mjs':['catalog.mjs','text/javascript'],'/scanner.mjs':['scanner.mjs','text/javascript'],'/scan-codecs.mjs':['scan-codecs.mjs','text/javascript'],'/workflows.mjs':['workflows.mjs','text/javascript'],'/workflow-ui.mjs':['workflow-ui.mjs','text/javascript'],'/':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','text/javascript'],'/employees.mjs':['employees.mjs','text/javascript'],'/records.mjs':['records.mjs','text/javascript'],'/schema.mjs':['schema.mjs','text/javascript'],'/styles.css':['styles.css','text/css']};
+  const files={'/catalog.mjs':['catalog.mjs','text/javascript'],'/scanner.mjs':['scanner.mjs','text/javascript'],'/scan-codecs.mjs':['scan-codecs.mjs','text/javascript'],'/workflows.mjs':['workflows.mjs','text/javascript'],'/workflow-ui.mjs':['workflow-ui.mjs','text/javascript'],'/owner.html':['owner.html','text/html; charset=utf-8'],'/owner-dashboard.js':['owner-dashboard.js','text/javascript'],'/':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','text/javascript'],'/employees.mjs':['employees.mjs','text/javascript'],'/records.mjs':['records.mjs','text/javascript'],'/schema.mjs':['schema.mjs','text/javascript'],'/styles.css':['styles.css','text/css']};
   return http.createServer(async(req,res)=>{try{
     const url=new URL(req.url,'http://localhost'),path=url.pathname;
     if(path==='/'&&['GET','HEAD'].includes(req.method)&&String(req.headers.host||'').split(':')[0]==='app.kennelflowpro.app'){res.writeHead(302,{'Location':'https://app.kennelone.app/'+url.search,'Cache-Control':'no-store'});res.end();return;}
@@ -70,6 +71,24 @@ export function createWebServer({backend=BACKEND,fetcher=fetch,secure=process.en
       return send(res,200,{ok:true},{'Set-Cookie':cookie('',0)});
     }
     if(!s||Date.now()-s.created>SESSION_MS){sessions.delete(id);return send(res,401,{error:'Sign in required'})}
+    if(path==='/api/activity/heartbeat'&&req.method==='POST'){
+      const {platform}=await json(req,1024);
+      if(!['web','windows'].includes(platform))throw fail(400,'Invalid platform');
+      const response=await fetcher(OWNER_ACTIVITY+'/v2/activity/heartbeat',{
+        method:'POST',headers:{Authorization:'Bearer '+s.token,'Content-Type':'application/json'},
+        body:JSON.stringify({platform}),redirect:'manual',signal:AbortSignal.timeout(15000)
+      });
+      if(response.status>=300&&response.status<400)throw fail(502,'Activity redirect blocked');
+      return forward(res,response);
+    }
+    if(req.method==='GET'&&['/api/platform-owner/overview','/api/platform-owner/activity'].includes(path)){
+      const suffix=path==='/api/platform-owner/overview'?'overview':'activity';
+      const response=await fetcher(OWNER_ACTIVITY+'/v2/platform-owner/'+suffix,{
+        method:'GET',headers:{Authorization:'Bearer '+s.token},redirect:'manual',signal:AbortSignal.timeout(15000)
+      });
+      if(response.status>=300&&response.status<400)throw fail(502,'Activity redirect blocked');
+      return forward(res,response);
+    }
     if(path==='/api/me'&&req.method==='GET')return forward(res,await upstream('/v2/me',s.token));
     if(path==='/api/kennels'&&req.method==='GET'){const r=await upstream('/v2/me',s.token);const value=await r.json();return send(res,r.status,r.status===200?{kennels:value.kennels}:value)}
     const employee=/^\/api\/kennels\/([^/]+)\/(members|invitations|clock|history)(?:\/([^/]+))?$/.exec(path);

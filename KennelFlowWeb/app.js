@@ -27,11 +27,31 @@ async function api(path,options={}) {
   if(!r.ok)throw Object.assign(Error(data.error||'Cloud unavailable'),{status:r.status});
   return data;
 }
+// Best-effort reporting for signed-in Business Cloud accounts only.
+let lastActivityInterval=0;
+function activityPlatform(){
+  const platform=navigator.userAgentData?.platform||navigator.platform||'';
+  const installed=window.matchMedia?.('(display-mode: standalone)')?.matches||false;
+  return /Win/i.test(platform)&&installed?'windows':'web';
+}
+async function sendActivityInterval(){
+  if(!identity||document.hidden||Date.now()-lastActivityInterval<300000)return;
+  lastActivityInterval=Date.now();
+  try{await api('activity/heartbeat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({platform:activityPlatform()})})}
+  catch{lastActivityInterval=0}
+}
+async function verifyPlatformOwner(){
+  const link=$('platformOwnerLink');if(!link)return;
+  link.hidden=true;
+  try{await api('platform-owner/overview');if(identity)link.hidden=false}
+  catch{link.hidden=true}
+}
 async function init(){
   try{
     const value=await api('me');
     if(identity?.id!==value.user.id||editor&&!value.kennels?.some(k=>k.id===editor.kennel)){rows.clear();teamMembers=[];employees.reset();closeEditor(true)}
     identity=value.user;kennels=value.kennels||[];
+    void sendActivityInterval();void verifyPlatformOwner();
     $('kennel').replaceChildren(...kennels.map(k=>{const o=el('option',k.name);o.value=k.id;return o}));
     if(!kennels.some(k=>k.id===kennel))kennel=kennels[0]?.id||'';
     $('kennel').value=kennel;
@@ -522,7 +542,7 @@ $('cameraUpload').onchange=()=>{const file=$('cameraUpload').files?.[0];if(!file
 $('printReport').onclick=()=>{document.body.classList.add('print-report');window.print()};
 $('closeReport').onclick=()=>{$('reportDialog').close();document.body.classList.remove('print-report')};
 window.addEventListener('afterprint',()=>document.body.classList.remove('print-report'));
-$('logout').addEventListener('click',async()=>{if(!closeEditor())return;try{await api('logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})}finally{loadSequence++;employees.reset();workflows.reset();stopScanner?.();stopScanner=null;$('reportDialog').close();$('reportContent').replaceChildren();document.body.classList.remove('print-report');teamMembers=[];rows.clear();identity=null;kennel='';role='';$('workspace').hidden=true;$('login').hidden=false;$('overview').replaceChildren();$('list').replaceChildren();message();setConnection('Signed out')}});
+$('logout').addEventListener('click',async()=>{if(!closeEditor())return;try{await api('logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})}finally{loadSequence++;employees.reset();workflows.reset();stopScanner?.();stopScanner=null;$('reportDialog').close();$('reportContent').replaceChildren();document.body.classList.remove('print-report');teamMembers=[];rows.clear();identity=null;$('platformOwnerLink').hidden=true;kennel='';role='';$('workspace').hidden=true;$('login').hidden=false;$('overview').replaceChildren();$('list').replaceChildren();message();setConnection('Signed out')}});
 $('kennel').addEventListener('change',async()=>{if(!closeEditor()){$('kennel').value=kennel;return}employees.reset();workflows.reset();stopScanner?.();stopScanner=null;$('reportDialog').close();$('reportContent').replaceChildren();teamMembers=[];kennel=$('kennel').value;rows.clear();role='';render();await load()});
 $('refresh').addEventListener('click',()=>load());$('add').addEventListener('click',()=>openEditor());$('collection').addEventListener('change',()=>{selectedDay='';renderList()});$('search').addEventListener('input',renderList);$('deleted').addEventListener('change',renderList);$('recordForm').addEventListener('submit',save);$('closeEditor').addEventListener('click',()=>closeEditor());$('cancelEditor').addEventListener('click',()=>closeEditor());$('editor').addEventListener('cancel',e=>{e.preventDefault();if(!saving)closeEditor()});$('upload').addEventListener('change',dirty);$('print').addEventListener('click',()=>{document.querySelectorAll('#list details').forEach(d=>d.open=true);window.print()});
 
@@ -548,6 +568,7 @@ $('print').insertAdjacentElement('afterend',exportButton);
 window.addEventListener('beforeunload',e=>{if(editor?.dirty){e.preventDefault();e.returnValue=''}});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&identity&&!loading&&!saving)load(true)});
 setInterval(()=>{if(!document.hidden&&identity&&!loading&&!saving&&!$('reauth').open)load(true)},15000);
+setInterval(()=>{if(identity&&!document.hidden)void sendActivityInterval()},60000);
 let invitationMode=false;
 function showJoin(){invitationMode=true;$('join').hidden=false;$('login').hidden=true;$('workspace').hidden=true}
 $('showJoin').onclick=showJoin;

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kennel One | Platform Owner Dashboard</title>
+<link rel="stylesheet" href="/styles.css">
+<style>
+.owner-shell{max-width:1160px;margin:auto;padding:1rem 1rem 4rem}
+.owner-shell h1{margin-bottom:.3rem}
+.owner-toolbar{display:flex;flex-wrap:wrap;justify-content:space-between;gap:1rem;align-items:center}
+.owner-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1rem;margin:1rem 0}
+.owner-metric{padding:1.1rem;border:1px solid #d5dbda;border-radius:12px;background:white}
+.owner-metric strong{display:block;font-size:1.7rem;margin:.4rem 0}
+.owner-metric small{display:block;color:#52616c}
+.owner-table{width:100%;border-collapse:collapse}
+.owner-table td,.owner-table th{padding:.8rem;text-align:left;border-bottom:1px solid #ddd}
+.owner-scroll{overflow-x:auto}
+#ownerStatus{margin:.8rem 0}
+.owner-muted{color:#52616c}
+</style>
+</head>
+<body>
+<header><a class="brand" href="/">Kennel One</a></header>
+<main class="owner-shell">
+<div class="owner-toolbar"><div><p class="eyebrow">PRIVATE PLATFORM ADMINISTRATION</p><h1>Customer Activity & Downloads</h1></div>
+<div><a href="/">Back to Kennel One</a> <button type="button" id="reload">Refresh dashboard</button></div></div>
+<p class="owner-muted">Restricted to verified Kennel One platform-owner accounts. A store download is not a Business Cloud account or a known individual.</p>
+<p id="ownerStatus" role="status" aria-live="polite">Checking platform-owner access…</p>
+<section id="ownerData" hidden>
+<h2>All platforms</h2><div id="accountSummary" class="owner-grid"></div>
+<h2>Subscriptions</h2><div id="subscriptionSummary" class="owner-grid"></div>
+<p class="owner-muted">Subscription totals come from verified Business Cloud entitlements. Store purchase reports can differ.</p>
+<h2>By platform</h2><div id="platformCards" class="owner-grid"></div>
+<h2>Signed-in customer accounts</h2><p class="owner-muted">Names are available only for customers who registered with Business Cloud. Online means activity in the last five minutes. Activity counts are throttled intervals, not individual clicks.</p>
+<div class="owner-scroll"><table class="owner-table"><thead><tr><th>Name</th><th>Email</th><th>Presence</th><th>Platform</th><th>Last seen</th><th>Subscription</th></tr></thead><tbody id="customerRows"></tbody></table></div>
+</section>
+</main><script type="module" src="/owner-dashboard.js"></script>
+</body></html>
