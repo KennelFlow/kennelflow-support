@@ -1,4 +1,4 @@
-name: Kennel One Microsoft Store API read-only validation
+name: Kennel One Store restricted database connection test
 
 on:
   push:
@@ -15,10 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 7
     env:
-      MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
-      MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
-      MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
-      MSSTORE_DRY_RUN: '1'
+      NEON_STORE_REPORTING_DATABASE_URL: ${{ secrets.NEON_STORE_REPORTING_DATABASE_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,27 +23,37 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: StoreAnalytics/package-lock.json
-      - name: Verify credentials present without logging them
-        run: |
-          test -n "$MSSTORE_TENANT_ID"
-          test -n "$MSSTORE_CLIENT_ID"
-          test -n "$MSSTORE_CLIENT_SECRET"
-      - name: Install audited dependencies
+      - name: Check restricted connection exists
+        shell: bash
+        run: test -n "$NEON_STORE_REPORTING_DATABASE_URL"
+      - name: Install exact reviewed dependencies
         run: npm ci --prefix StoreAnalytics --ignore-scripts --no-audit
-      - name: Run importer safety tests
-        run: npm test --prefix StoreAnalytics
-      - name: Compare Store API date ranges without changing any records
+      - name: Verify reporting-only PostgreSQL role without modifying data
         run: |
           node --input-type=module <<'NODE'
-          import {getMicrosoftToken,getMicrosoftInstalls,reportWindow} from './StoreAnalytics/src/microsoft-store.mjs';
-          const token=await getMicrosoftToken({
-            tenantId:process.env.MSSTORE_TENANT_ID,
-            clientId:process.env.MSSTORE_CLIENT_ID,
-            clientSecret:process.env.MSSTORE_CLIENT_SECRET
-          });
-          for (const days of [30, 60, 90]) {
-            const {startDate,endDate}=reportWindow(new Date(),days);
-            const result=await getMicrosoftInstalls({token,startDate,endDate});
-            console.log(JSON.stringify({days,startDate,endDate,count:result.total,pages:result.pages}));
+          import pg from './StoreAnalytics/node_modules/pg/lib/index.js';
+          const connectionString=process.env.NEON_STORE_REPORTING_DATABASE_URL;
+          if (!connectionString) throw Error('Missing database connection');
+          const url=new URL(connectionString);
+          if(url.protocol!=='postgresql:' || !url.hostname.endsWith('.neon.tech') || url.username!=='kennelone_store_reporting_20261028'){
+            throw Error('Unexpected reporting connection destination or role');
+          }
+          const client=new pg.Client({connectionString,ssl:{rejectUnauthorized:true},connectionTimeoutMillis:12000});
+          try {
+            await client.connect();
+            const result=await client.query(`SELECT current_user AS username,
+              has_table_privilege(current_user,'public.platform_store_metrics','SELECT') AS may_read,
+              has_table_privilege(current_user,'public.platform_store_metrics','INSERT') AS may_insert,
+              has_table_privilege(current_user,'public.platform_store_metrics','UPDATE') AS may_update,
+              has_table_privilege(current_user,'public.platform_store_metrics','DELETE') AS may_delete,
+              has_schema_privilege(current_user,'public','CREATE') AS may_create_schema_items,
+              has_database_privilege(current_user,current_database(),'CREATE') AS may_create_database_items,
+              (SELECT count(*)::integer FROM information_schema.role_table_grants WHERE grantee=current_user AND table_schema='public' AND table_name<>'platform_store_metrics') AS other_table_grants`);
+            const v=result.rows[0];
+            const safe=v.username==='kennelone_store_reporting_20261028'&&v.may_read&&v.may_insert&&v.may_update&&!v.may_delete&&!v.may_create_schema_items&&!v.may_create_database_items&&v.other_table_grants===0;
+            console.log('Restricted reporting database role validation: '+(safe?'PASS':'FAIL'));
+            if(!safe) throw Error('Reporting role has incorrect permissions');
+          } finally {
+            await client.end();
           }
           NODE
