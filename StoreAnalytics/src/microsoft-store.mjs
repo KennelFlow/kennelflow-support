@@ -128,6 +128,9 @@ export async function syncWindowsStore({env = process.env, fetcher = fetch, open
   const token = await getMicrosoftToken({tenantId, clientId, clientSecret, fetcher});
   const report = await getMicrosoftInstalls({token, startDate, endDate, fetcher});
   if (env.MSSTORE_DRY_RUN === '1') return {...report, saved: false};
+  // Partner Center can lag the dashboard or return no rows for a rolling window.
+  // Preserve the last verified metric until a zero is reconciled independently.
+  if (report.total === 0) return {...report, saved: false, warning: 'zero_count_requires_verification'};
   if (typeof openDatabase !== 'function') throw Error('Database connection function missing');
   const db = await openDatabase(env.NEON_STORE_REPORTING_DATABASE_URL);
   try {

@@ -128,3 +128,15 @@ test('requires connection secrets before networking and does not write on dry-ru
   assert.equal(result.saved,false);
   assert.equal(requests,2);
 });
+
+test('API zero does not overwrite a previously verified Store count', async () => {
+  const fetcher=async (url)=> url.includes('login.microsoftonline.com')
+    ? Response.json({access_token:'mock'}) : Response.json({Value:[]});
+  const res=await syncWindowsStore({
+    env:{MSSTORE_TENANT_ID:guid,MSSTORE_CLIENT_ID:guid,MSSTORE_CLIENT_SECRET:'mock',
+      NEON_STORE_REPORTING_DATABASE_URL:'postgresql://unreachable.invalid/unused'},
+    fetcher, openDatabase:async()=>{throw Error('Zero must not contact Neon')}
+  });
+  assert.equal(res.total,0);assert.equal(res.saved,false);
+  assert.equal(res.warning,'zero_count_requires_verification');
+});
