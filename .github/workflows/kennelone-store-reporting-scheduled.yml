@@ -1,0 +1,46 @@
+name: Kennel One Microsoft Store daily reporting
+
+on:
+  schedule:
+    - cron: '27 13 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kennelone-store-reporting-scheduled
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
+      MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
+      MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+      NEON_STORE_REPORTING_DATABASE_URL: ${{ secrets.NEON_STORE_REPORTING_DATABASE_URL }}
+    steps:
+      - name: Require all reporting secrets
+        run: |
+          test -n "$MSSTORE_TENANT_ID"
+          test -n "$MSSTORE_CLIENT_ID"
+          test -n "$MSSTORE_CLIENT_SECRET"
+          test -n "$NEON_STORE_REPORTING_DATABASE_URL"
+      - name: Check out the tested standalone importer (pinned commit)
+        uses: actions/checkout@v4
+        with:
+          ref: c6760e066326cfa877ed524b426516dd273859f9
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: StoreAnalytics/package-lock.json
+      - name: Install locked dependencies without scripts
+        run: npm ci --prefix StoreAnalytics --ignore-scripts --no-audit
+      - name: Run importer safety tests
+        run: npm test --prefix StoreAnalytics
+      - name: Sync Microsoft Store installs using restricted Neon role
+        run: npm run sync --prefix StoreAnalytics
