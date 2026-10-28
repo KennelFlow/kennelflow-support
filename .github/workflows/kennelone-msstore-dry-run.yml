@@ -1,0 +1,39 @@
+name: Kennel One Microsoft Store API read-only validation
+
+on:
+  push:
+    branches:
+      - kennelone-msstore-importer-ready-20261027
+    paths:
+      - .github/workflows/kennelone-msstore-dry-run.yml
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    env:
+      MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
+      MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
+      MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+      MSSTORE_DRY_RUN: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: StoreAnalytics/package-lock.json
+      - name: Verify credentials present without logging them
+        run: |
+          test -n "$MSSTORE_TENANT_ID"
+          test -n "$MSSTORE_CLIENT_ID"
+          test -n "$MSSTORE_CLIENT_SECRET"
+      - name: Install audited dependencies
+        run: npm ci --prefix StoreAnalytics --ignore-scripts --no-audit
+      - name: Run importer safety tests
+        run: npm test --prefix StoreAnalytics
+      - name: Test live Store analytics API (read-only)
+        run: npm run sync --prefix StoreAnalytics
