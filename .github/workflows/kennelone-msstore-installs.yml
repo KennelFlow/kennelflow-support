@@ -1,0 +1,51 @@
+name: Kennel One Microsoft Store daily installs
+
+on:
+  schedule:
+    - cron: '27 13 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kennelone-microsoft-store-installs
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
+      MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
+      MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+      NEON_STORE_REPORTING_DATABASE_URL: ${{ secrets.NEON_STORE_REPORTING_DATABASE_URL }}
+    steps:
+      - name: Check configuration without exposing secrets
+        id: config
+        shell: bash
+        run: |
+          if [[ -z "$MSSTORE_TENANT_ID" || -z "$MSSTORE_CLIENT_ID" || -z "$MSSTORE_CLIENT_SECRET" || -z "$NEON_STORE_REPORTING_DATABASE_URL" ]]; then
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo 'Store analytics is not connected. Configure its four repository secrets.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.config.outputs.ready == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.config.outputs.ready == 'true'
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: StoreAnalytics/package-lock.json
+      - name: Install exact reviewed dependencies
+        if: steps.config.outputs.ready == 'true'
+        run: npm ci --prefix StoreAnalytics --ignore-scripts
+      - name: Run security and integration unit tests
+        if: steps.config.outputs.ready == 'true'
+        run: npm test --prefix StoreAnalytics
+      - name: Import official Windows installs
+        if: steps.config.outputs.ready == 'true'
+        run: npm run sync --prefix StoreAnalytics
