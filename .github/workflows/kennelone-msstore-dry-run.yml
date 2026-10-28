@@ -35,5 +35,18 @@ jobs:
         run: npm ci --prefix StoreAnalytics --ignore-scripts --no-audit
       - name: Run importer safety tests
         run: npm test --prefix StoreAnalytics
-      - name: Test live Store analytics API (read-only)
-        run: npm run sync --prefix StoreAnalytics
+      - name: Compare Store API date ranges without changing any records
+        run: |
+          node --input-type=module <<'NODE'
+          import {getMicrosoftToken,getMicrosoftInstalls,reportWindow} from './StoreAnalytics/src/microsoft-store.mjs';
+          const token=await getMicrosoftToken({
+            tenantId:process.env.MSSTORE_TENANT_ID,
+            clientId:process.env.MSSTORE_CLIENT_ID,
+            clientSecret:process.env.MSSTORE_CLIENT_SECRET
+          });
+          for (const days of [30, 60, 90]) {
+            const {startDate,endDate}=reportWindow(new Date(),days);
+            const result=await getMicrosoftInstalls({token,startDate,endDate});
+            console.log(JSON.stringify({days,startDate,endDate,count:result.total,pages:result.pages}));
+          }
+          NODE
