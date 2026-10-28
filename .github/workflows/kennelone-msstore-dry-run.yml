@@ -1,0 +1,59 @@
+name: Kennel One Store restricted database connection test
+
+on:
+  push:
+    branches:
+      - kennelone-msstore-importer-ready-20261027
+    paths:
+      - .github/workflows/kennelone-msstore-dry-run.yml
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    env:
+      NEON_STORE_REPORTING_DATABASE_URL: ${{ secrets.NEON_STORE_REPORTING_DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: StoreAnalytics/package-lock.json
+      - name: Check restricted connection exists
+        shell: bash
+        run: test -n "$NEON_STORE_REPORTING_DATABASE_URL"
+      - name: Install exact reviewed dependencies
+        run: npm ci --prefix StoreAnalytics --ignore-scripts --no-audit
+      - name: Verify reporting-only PostgreSQL role without modifying data
+        run: |
+          node --input-type=module <<'NODE'
+          import pg from './StoreAnalytics/node_modules/pg/lib/index.js';
+          const connectionString=process.env.NEON_STORE_REPORTING_DATABASE_URL;
+          if (!connectionString) throw Error('Missing database connection');
+          const url=new URL(connectionString);
+          if(url.protocol!=='postgresql:' || !url.hostname.endsWith('.neon.tech') || url.username!=='kennelone_store_reporting_20261028'){
+            throw Error('Unexpected reporting connection destination or role');
+          }
+          const client=new pg.Client({connectionString,ssl:{rejectUnauthorized:true},connectionTimeoutMillis:12000});
+          try {
+            await client.connect();
+            const result=await client.query(`SELECT current_user AS username,
+              has_table_privilege(current_user,'public.platform_store_metrics','SELECT') AS may_read,
+              has_table_privilege(current_user,'public.platform_store_metrics','INSERT') AS may_insert,
+              has_table_privilege(current_user,'public.platform_store_metrics','UPDATE') AS may_update,
+              has_table_privilege(current_user,'public.platform_store_metrics','DELETE') AS may_delete,
+              has_schema_privilege(current_user,'public','CREATE') AS may_create_schema_items,
+              has_database_privilege(current_user,current_database(),'CREATE') AS may_create_database_items,
+              (SELECT count(*)::integer FROM information_schema.role_table_grants WHERE grantee=current_user AND table_schema='public' AND table_name<>'platform_store_metrics') AS other_table_grants`);
+            const v=result.rows[0];
+            const safe=v.username==='kennelone_store_reporting_20261028'&&v.may_read&&v.may_insert&&v.may_update&&!v.may_delete&&!v.may_create_schema_items&&!v.may_create_database_items&&v.other_table_grants===0;
+            console.log('Restricted reporting database role validation: '+(safe?'PASS':'FAIL'));
+            if(!safe) throw Error('Reporting role has incorrect permissions');
+          } finally {
+            await client.end();
+          }
+          NODE
